@@ -1,0 +1,63 @@
+# ----------  For HTTP ------------# 
+#Test with AMR#2
+#amr_uri: http://192.168.30.165:6060/
+# Benjin CitiGo
+# Bengin CitiGo test on laptop
+# amr_uri : 'http://192.168.64.9:8080/'
+# Bengin CitiGo test at 136
+# amr_uri : 'http://192.168.79.18:8080/'
+# Office test on NB
+AMR_URI : 'http://192.168.30.48:6060/'
+# AMR_URI : 'http://192.168.30.139:8080/'
+# AMR_URI : 'http://192.168.30.132:8080/'
+
+# ----------  For MQTT ------------# 
+AMR_MQTT_NAME: ["AMR250_TEST"]  # TODO 
+BROKER_IP: "iot.eclipse.org" # TODO 
+#BROKER_IP: "192.168.30.101" # Office test 
+#BROKER_IP: "192.168.64.10" # Office test 
+CLIENT_NAME : "elevator_server" # [DON"T MODIFIED]
+
+# ---------- For XBEE ------------# 
+XBEE_HOST_IP: '195.0.0.13' # P2P
+
+#-----------  PB setting ----------# 
+# TODO : You must check and modify this after installlation 
+#table = {KEY:[boardNo. ConnectorNo]}s
+table:
+    'close' : [1, 1]
+    'open' : [1, 2]
+    '1' : [1, 3] 
+    '4' : [1, 9]  
+    '2' : [1, 7]  
+    '3' : [1, 8]
+
+FLOOR_LED_CONFIRMATION_MAX_TIME : [ 2, 2 ] # TODO 
+FLOOR_LED_CONFIRMATION_MIN_TIME : [ 0.5, 0.5 ] # TODO 
+DOOR_OPEN_LIMIT_TIME: 60.0 #sec # MAX time that door can keep open, after that, timeout_release.
+WAIT_REACH_LIMIT_TIME: 300.0 #sec # MAX time that wait for EV to reach assign floor.
+IS_SIMULATION: False # Switch to True if you want to simulate in ROS system
+# ------ Notify Protocal Choose --------# 
+IS_USING_MQTT: True
+IS_USING_HTTP: True
+IS_USING_XBEE: False 
+#------- Door Status Verify ------# 
+ENABLE_VERIFY_DOOR_STATUS: False #[TODO] Shandi is True
+CLOSE_EYE_WAIT_DOOR_SEC: 3 # [TODO] This will only be use, when ENABLE_VERIFY_DOOR_STATUS is False 
+#------- RSS Tools, For weixin meg ------# 
+# TODO 
+is_using_rss: False 
+CORP_ID: 'ww0692f024800a89da'
+CORP_SECRET: 'aKA9FsvaU02m5UH4uuYKOq3KGcud2UqXDJoaPhlzDjg'
+AGENT_ID: 1000005
+
+
+#------- Fix parameters ---------# DO NOT modified parameters below.
+NOTIFY_MAX_RETRY_TIME: 60 #sec [DON"T MODIFIED]  # MAX time to wait for notify CB (http: 200OK , MOTT: on_publish())
+WAIT_DOOR_LIMIT: 20 #[DON"T MODIFIED]
+REC_TIMEOUT: 0.1 #sec [DON"T MODIFIED]  # How long whould you wait for reply from ST board
+IS_VERBOSE: False #sec [DON"T MODIFIED]  # How long whould you wait for reply from ST board
+SLIENCE_MIN_COUNTER: 5 # 0.1 * 30  = 3 sec [DON"T MODIFIED] # This is a useless param
+
+
+

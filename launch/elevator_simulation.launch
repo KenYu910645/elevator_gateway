@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!--  elevator_server  -->
+    <node name="elevator_server" pkg="elevator_gateway" type="elevator_server.py" output="screen"/>
+</launch>

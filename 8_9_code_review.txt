@@ -1,0 +1,20 @@
+mcu.cpp
+1. LIne 31,32, 使用mbed原本的NC
+2. Line 138, Use Vector then array
+3. Line 149, substr() cost 高
+4. 考慮不要用recbufArr
+5. AMR 主動偵測門有沒有開?
+
+elevator_server.py
+1. is_floor_press()- new project - 思考並提出所有可能的狀況
+2. python function 在呼叫時可以加argument 名稱，增加易讀性
+3. is_evNotReach 不必要用timer, 用counter
+4. &action={enterEV,alightEV}, default to be enterEV : 兩者開門秒數不同
+5. LIne 195, try 太大, try only r = s.get(req, timeout=10)
+6. Line 392, 's' too short 
+7. 例外狀況寫在後面
+8. /precall?floor=x  沒有人用的狀況下，偷偷按一下，不用open_lock，不用告知ＡＭＲ，不用船ａｃｔｉｏｎ
+9. Line 325 , flushinput 拿掉
+10. Err -> 重傳？
+11. baudrate 嘗試 57600
+12.[w,10,0,tid], 成功也要回傳
