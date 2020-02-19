@@ -1,444 +1,580 @@
-#!/usr/bin/python
+#!/usr/bin/python3
+# For TK GUI
+import tkinter as tk
+import tkinter.messagebox
+from PIL import Image
+from PIL import ImageTk
+import queue
 import os
-import sys
 import time
-import numpy 
-import curses
-from std_msgs.msg import String
-import rospy 
+import threading # get rid of counters, use timer
+# For IPC # message queue
+import posix_ipc
+#-------  Elevator Parameters   ---------# 
+LOOP_PERIOD       = 0.01 # sec
+DOOR_OPENING_TIME = 2 # sec
+DOOR_CLOSING_TIME = 2 # sec
+OPEN_LOCK_TIME    = 3 # sec
+NEXT_FLOOR_TIME   = 2 # sec
+EV_LOCATION_MAX = 1000 # 0~1000
+DOOR_SENSOR_MAX = 1000 # 0~1000
+LED_SUSTAIN_TIME = 1   # sec
+PRESS_BT_TIME    = 0.5 # sec 
 
-class button(object):
-    def __init__(self, name, upper, lower):
-        self.name = name
-        self.led = 0 # 0 -> low , 1 -> high
-        self.switch = 0 # 0 -> low , 1 -> high
-        self.upper = ''
-        self.lower = ''
-pb_dic = {'open' : button("open", '' , '' ) ,'close' : button('close', '' , '' ), '1' : button('1', '2', '') ,'2' : button('2', '3', '1') , '3' : button('3', '4' , '2'), '4' : button('4', '' , '3')}
+#------- Tkinter  parameter   -------# 
+EV_PANEL_BTS_SIZE  = 3
+EV_PANEL_TOTAL_ROW = 4 # add 1 row for led 
+EV_PANEL_TOTAL_COL = 2
+# space between buttons
+EV_PANEL_PADX  = 0
+EV_PANEL_PADY  = 0
+# space between text and button's broards, will change size of buttons
+EV_PANEL_IPADX = 1
+EV_PANEL_IPADY = 1
+#
+EV_STATE_CANVAS_PERIOD = 100 # for animation
+#
+BUTTON_HIGHLIGHT_COLOR = "yellow"
+BUTTON_COLOR = "light gray"
 
-# //**********************  Global variable   ****************************//
-# // record elevator runtime state
-state = "standing_by" # standing_by, opening, opened, closing, moving
-direction = "no_assign" # no_assign, up, down
-target_floor = 0 #  // Which floor does elevator plan to go. 0 means there's no target_floor.
-current_floor = 1 #  // Which floor does elevator at right NOW.
-# //Counters - to wait a period of time
-open_lock_counter = 0
-next_floor_counter = 0
-exting_count = 0
-door_counter = 0 # 0 ~ DOOR_COUNTER_MAX
-# //Parameters
-DOOR_COUNTER_MAX = 1000
-NEXT_FLOOR_TIME = 200
-OPENING_VEL = 4
-CLOSING_VEL = 4
-OPEN_LOCK_TIME = 400
-LOWEST_FLOOR = 1 # // -1 -> B1, -2 -> B2
-HIGHEST_FLOOR = 4
+class ev_panel_bts(object):
+    def __init__(self,frame, name, row ,column, command, pic_path):
+        # Create a button object on tk
+        self.bt = tk.Button(frame, text=name ,command = command , height = EV_PANEL_BTS_SIZE, width = EV_PANEL_BTS_SIZE)
+        # where to put this button respect to panel
+        self.bt.grid(row = row , column = column, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY,\
+                                                 ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        # Name of this button
+        self.name   = name # '1F' , '2F' , 'open', 'close'
+        # simulate ev button led, 0 -> led stay low , 1 -> led is on 
+        self.led    = 0
+        # simulate ev panel button, 0 -> button not pressed , 1 -> button pressed
+        self.switch = 0
+        # simulate elevator press button 
+        self.switch_server = 0 
+        # picture path of this floor 
+        self.pic_path = pic_path
+class app():
+    def __init__(self):
+        #-----------    Elevator State    ------------# 
+        # Elevator state : standing_by, opening, opened, closing, moving
+        self.state = "standing_by"
+        # Elevator moving direction : no_assign, up, down
+        self.direction = "no_assign"
+        # Elevator currently at which floor 
+        self.current_floor = "1"
+        # Elevator target floor. Which floor does elevator plan to go? "" means no target_floor.
+        self.target_floor  = "" 
+        
+        #IPC cmd from elevator server 
+        self.queue = queue.Queue()
+        # For opened door timer
+        self.timer = None
+        
+        # ----------   Counters/Sensor ------------  #
+        # Show how much does elevator's door opened
+        # 0 ~ DOOR_COUNTER_MAX ,  0 means door fully close , DOOR_COUNTER_MAX means door fully open 
+        self.door_sensor = 0.0
+        # Show where is elevator among these floors
+        # 0 ~ EV_LOCATION_MAX   , 0 means ev at lowest floor , EV_LOCATION_MAX means eleevator at highest floor
+        self.ev_location_sensor = 0.0
 
-# Previous state
-#pre_state = None 
-#pre_current_floor = None
-#pre_target_floor = None
-#pre_direction = None
-#pre_pb_dic = None 
+        # counter for canvas_state 
+        self.animate_counter = 0 
 
-# Rostopic Call back buffer
-cmd_list = []
+        # ----------   Tk window and frame------------  #
+        self.window = tk.Tk()
+        self.window.title("Elevator Simulator")# title of window
+        self.window.iconphoto(False, tk.PhotoImage(file='pic/icon.png'))# icon of window
+        # self.window.geometry('500x800') # dont specify, tk will automatic assign a proper size.
+        # window.resizable(0,0) # disable resize window 
 
-def seven_section_led_set(sec_num_list, seven_section_led):
-    for sec_num in sec_num_list: 
-        if sec_num == 1: 
-            seven_section_led[0,:] = 1
-        elif sec_num == 2:
-            seven_section_led[0:3,0] = 1
-        elif sec_num == 3:
-            seven_section_led[0:3,4] = 1
-        elif sec_num == 4:
-            seven_section_led[2,:] = 1
-        elif sec_num == 5: 
-            seven_section_led[2:5,0] = 1
-        elif sec_num == 6:
-            seven_section_led[2:5,4] = 1
-        elif sec_num == 7: 
-            seven_section_led[4,:] = 1
-        else: 
-            pass
-    return seven_section_led
+        # Group frame
+        self.ev_bts = tk.Frame(self.window)
+        self.ev_bts.pack(side = tk.LEFT)
 
+        # ----------   elevator_panel_buttonr ------------  # 
+        '''
+        define elevator button 
+        '''
+        self.bt_dic = {"1"    : ev_panel_bts(self.ev_bts, "1F",     EV_PANEL_TOTAL_ROW-2 ,0, self.cb_bt_1f,    "pic/1_digit.pgm"),\
+                       "2"    : ev_panel_bts(self.ev_bts, "2F",     EV_PANEL_TOTAL_ROW-3 ,0, self.cb_bt_2f,    "pic/2_digit.pgm"),\
+                       "3"    : ev_panel_bts(self.ev_bts, "3F",     EV_PANEL_TOTAL_ROW-2 ,1, self.cb_bt_3f,    "pic/3_digit.pgm"),\
+                       "4"    : ev_panel_bts(self.ev_bts, "4F",     EV_PANEL_TOTAL_ROW-3 ,1, self.cb_bt_4f,    "pic/4_digit.pgm"),\
+                       "close" : ev_panel_bts(self.ev_bts, "close", EV_PANEL_TOTAL_ROW-1 ,0, self.cb_bt_close, None),\
+                       "open"  : ev_panel_bts(self.ev_bts, "open",  EV_PANEL_TOTAL_ROW-1 ,1, self.cb_bt_open , None)}
+        #define relationship among these floors, lowest floor is bt_list[0], hightest floor is bt_list[-1]
+        self.bt_list = ["1" , "2" , "3" , "4"] 
 
-def LED_cancel_wrong_floor():  # //TODO: alter LED board , when elevator arrived. Also use at plan()
-    # // Erase current Floor Led, Erase  led  with wrong direction, and Erase current_floor LED
-    # ----- Generate a List to check -------# 
-    global direction, state, pb_dic, target_floor, current_floor
-    checkList = []
-    for i in pb_dic:
-        try: 
-            floor = int(i)
-        except:  # 'open', 'close'
-            continue
-        else: 
-            pass 
-    if direction == "up": 
-                if floor >= LOWEST_FLOOR  and floor <= current_floor:
-                    checkList.append(pb_dic[i])
-    elif direction == "down": 
-                if floor >= current_floor  and floor <= HIGHEST_FLOOR:
-                    checkList.append(pb_dic[i])
-    elif direction == "no_assign": 
-                if floor >= LOWEST_FLOOR  and floor <= HIGHEST_FLOOR:
-                    checkList.append(pb_dic[i])
-    #-------  Use checkList to cancel wrong floor ---------# 
-    for i in checkList:
-        i.led = 0
+        ##############################
+        ###   elevator_led canvas  ###
+        ##############################
+        #------ Floor LED indicator --------# 
+        self.canvas_floor = tk.Canvas(self.ev_bts,bg = "white", height = 50 , width = 50)
+        self.canvas_floor.grid(row = 0 , column = 0, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY\
+                                                , ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        #------ EV state LED indicator --------# opening, closing , moving up , moving down 
+        self.canvas_state = tk.Canvas(self.ev_bts,bg = "white", height = 50 , width = 50)
+        self.canvas_state.grid(row = 0 , column = 1, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY\
+                                                , ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        
+        ##############################
+        ###   Draw TK object       ###
+        ##############################
+        ###----------   Text box  ----------###
+        self.text = tk.Text(self.window,height = 10, width = 20)
+        self.text.pack(side = tk.TOP)
 
-def plan(): 
-        global direction, state, pb_dic, target_floor, current_floor
-        # //  Prupose : To get direction and target floor
-        target_floor = 0 # ;//  # MUST TO BE 0, BEFORE PLANNING
-        # ----- Generate a List to check -------# 
-        checkList = []
-        for i in pb_dic:
-            try: 
-                floor = int(i)
-            except:  # 'open', 'close'
-                continue
-            else: 
-                pass 
-            if direction == "up": 
-                    if floor >= current_floor+1  and floor <= HIGHEST_FLOOR:
-                        checkList.append(pb_dic[i])
-            elif direction == "down":
-                if floor >= current_floor-1  and floor <= LOWEST_FLOOR:
-                    checkList.append(pb_dic[i])
-            elif direction == "no_assign": 
-                if floor >= LOWEST_FLOOR  and floor <= HIGHEST_FLOOR:
-                    checkList.append(pb_dic[i])
+        ###----------   cartoon canvas  ----------###
+        # User adjustable parameter
+        # frame size 
+        total_height = 600
+        total_width  = 300
+        # elevator size 
+        ev_width     = 80
+        ev_height    = 100
+        # amr robot size 
+        amr_height   = 30
+        amr_width    = 60
+        #
+        gap          = 5  # gap width between elevator and elevator well
+        canvas_edge  = 3  # gap width between elevator well and canvas edge
+        floor_thick  = 5  # thickness of floor
+        # location of amr, change in runtime (animation)
+        self.amr_location_x = 0
+        self.amr_location_y = 0
+        
+        ev_well_width  = 2*gap + ev_width
+        ev_well_height = total_height - canvas_edge # - 2*gap
+        ev_well_x = total_width - ev_well_width - canvas_edge
+        
+        max_ev_movement = ev_well_height - ev_height - 2*gap
+        floor_height = max_ev_movement / (len(self.bt_list)-1)
 
-        if direction == "up" or direction == "down":
-            for i in checkList:
-                if i.led: # (led_arr[i])
-                    target_floor = int(i.name) 
-        elif direction == "no_assign":
-                if target_floor == 0:  #  //: # Can't find any target floor in my direction
-                    direction = "no_assign"
-                # ------    Try to find assign floor at every direction  -------# 
-                for i in pb_dic:
-                    try: 
-                        floor = int(i)
-                    except:  # 'open', 'close'
-                        continue
-                    else: 
-                        if pb_dic[i].led : # (led_arr[i])
-                            # CHeck current floor 
-                            if pb_dic[i].name == str(current_floor):  #  // nasty exception TODO maybe don't add this is find
-                                continue
-                            else:
-                                target_floor = floor 
-                    if target_floor != 0: #  // You DID find a floor to go
-                        # //update direction
-                        if target_floor - current_floor > 0: #  // go up 
-                                direction = "up"
-                        else: #  // GO down
-                            direction = "down" # ;}
-                    else: #  {;} // Still can't find any target floor to go , Should be switch to standing by 
-                        pass 
-# } end of plan()
+        #------ cartoon canvas --------#
+        self.canvas_cartoon = tk.Canvas(self.window,bg = "white", height = total_height , width = total_width)
+        # self.canvas_state.grid(row = 0 , column = 1, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY, ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        self.canvas_cartoon.pack(side = tk.LEFT)
+        
+        #----------   Draw elevator well ----------#
+        ev_well_an1 = (ev_well_x               , canvas_edge)
+        ev_well_an2 = (ev_well_x+ev_well_width , ev_well_height)
+        self.ev_well = self.canvas_cartoon.create_rectangle(ev_well_an1[0],ev_well_an1[1],ev_well_an2[0],ev_well_an2[1], fill = "pink")
+        #----------   Draw elevator ----------#
+        ev_an2      = (ev_well_an2[0] - gap , ev_well_an2[1] - gap)
+        ev_an1      = (ev_an2[0] - ev_width , ev_an2[1] - ev_height)
+        self.ev      = self.canvas_cartoon.create_rectangle(ev_an1[0]     ,ev_an1[1]     ,ev_an2[0]     ,ev_an2[1]     , fill = "orange")
+        #----------   Draw floors ----------#
+        floors_an_list = []
+        for i in range(len(self.bt_list)):
+            floor_an1   =  (0              , ev_an2[1]      - i*floor_height)
+            floor_an2   =  (ev_well_an1[0] , ev_well_an2[1] + floor_thick - i*floor_height)
+            floors_an_list.append([floor_an1,floor_an2])
+            self.canvas_cartoon.create_rectangle(floor_an1[0]     ,floor_an1[1]     ,floor_an2[0]     ,floor_an2[1]     , fill = "black")
+        
+        #----------   Draw elevator door ----------#
+        # These doors should tranvel along with elevator 
+        self.left_door  = self.canvas_cartoon.create_rectangle(ev_an1[0],ev_an1[1], ev_an1[0] + ev_width/2  ,ev_an2[1], fill = "brown")
+        self.right_door = self.canvas_cartoon.create_rectangle(ev_an2[0],ev_an1[1], ev_an1[0] + ev_width/2  ,ev_an2[1], fill = "brown")
+        self.tmp_ori_1 = ev_an1[0]
+        self.tmp_ori_2 = ev_an2[0]
+        
+        #----------   Draw amr  ----------#
+        self.amr_location_x = total_width/2 -100
+        self.amr_location_y = floors_an_list[0][0][1] - amr_height
+        self.canvas_cartoon.create_rectangle(self.amr_location_x,self.amr_location_y,self.amr_location_x+amr_width,self.amr_location_y + amr_height, fill = "yellow")
+        
+        # helper variable for cute cartoon 
+        self.CARTOON_EV_MOVING_VEL    =   max_ev_movement/((NEXT_FLOOR_TIME/LOOP_PERIOD)*(len(self.bt_list) - 1))
+        self.CARTOON_DOOR_OPENING_VEL =  (ev_width/2)/(DOOR_OPENING_TIME/LOOP_PERIOD)
+        self.CARTOON_DOOR_CLOSING_VEL =  (ev_width/2)/(DOOR_CLOSING_TIME/LOOP_PERIOD)
+        # helper variable for counters
+        self.MOVING_VEL  = EV_LOCATION_MAX/((NEXT_FLOOR_TIME/LOOP_PERIOD)*(len(self.bt_list) - 1))
+        self.OPENING_VEL = DOOR_SENSOR_MAX/(DOOR_OPENING_TIME/LOOP_PERIOD)
+        self.CLOSING_VEL = DOOR_SENSOR_MAX/(DOOR_CLOSING_TIME/LOOP_PERIOD)
+        
+        #------ Dark Magic ------#
+        os.system("gnome-terminal -e 'python3 elevator_server.py'")
+        os.system("gnome-terminal -e 'python3 fake_amr_navi_center.py'")
+        #------ message queue for IPC -------# 
+        self.mq_send = posix_ipc.MessageQueue('/simu_IPC_reply', posix_ipc.O_CREAT)
+        self.mq_send.block = False # non-blocking recv , send
+        self.mq_recv = posix_ipc.MessageQueue('/simu_IPC_cmd'  , posix_ipc.O_CREAT)
+        self.mq_recv.block = False # non-blocking recv , send
+        ###-----------   start main loop   -------------###
+        self.main() # Recursive call main()
+        self.window.mainloop()
 
-def resetCounter():
-    global opening_counter,  open_lock_counter, closing_counter, next_floor_counter
-    opening_counter = 0
-    open_lock_counter = 0
-    closing_counter = 0
-    next_floor_counter = 0
+    def LED_cancel_wrong_floor(self):
+        '''
+        Toggle Led status to cancel illegal bts led
+        DON"T erase current_floor Led, erase led on oppisite direction
+        called when elevator arrived target floor and plan()
+        '''
+        current_idx = self.bt_list.index(self.current_floor)
+        if self.direction == "up":
+            for bt_key in self.bt_list[:current_idx]: # Don't include current floor
+                self.bt_dic[bt_key].led = 0
 
+        elif self.direction == "down": 
+            for bt_key in self.bt_list[current_idx+1:]:# Don't include current floor
+                self.bt_dic[bt_key].led = 0
+        
+        elif self.direction == "no_assign": # Don't include current floor
+            for bt_key in self.bt_list:
+                if bt_key != self.current_floor:
+                    self.bt_dic[bt_key].led = 0
+                    
 
-def main(win):
-    global direction, state, pb_dic, target_floor, current_floor,exting_count , pb_dic, open_lock_counter,DOOR_COUNTER_MAX, NEXT_FLOOR_TIME
-    global reply_pub, cmd_list, OPENING_VEL, CLOSING_VEL, OPEN_LOCK_TIME, LOWEST_FLOOR, HIGHEST_FLOOR, pre_state
-    global pre_current_floor, pre_target_floor, pre_direction, is_running_simu, next_floor_counter, door_counter
-
-    #------- init switch -------# 
-    for i in pb_dic: 
-        pb_dic[i].switch = 0
+    def plan(self):
+        '''
+        To get direction and target floor
+        '''
+        self.target_floor = "" # MUST BE "" BEFORE PLANNING
+        # ----- Generate a List to pick out target floor -------# 
+        candidate_floor = []
+        current_idx = self.bt_list.index(self.current_floor) 
+        if self.direction == "up": 
+            for bt in self.bt_list[current_idx+1:]: # Don't include current 
+                candidate_floor.append(bt)
+        elif self.direction == "down":
+            for bt in self.bt_list[:current_idx]: # Don't include current 
+                candidate_floor.append(bt)
+        elif self.direction == "no_assign": 
+            for bt in self.bt_list: # Don't include current 
+                candidate_floor.append(bt)
+        
+        # ------ Get a target floor from candidate_floor list -------# 
+        # Find a target floor at current direction
+        if self.direction != 'no_assign':
+            for bt in candidate_floor:
+                if self.bt_dic[bt].led:
+                    self.target_floor = bt
+        else:  #  self.direction == "no_assign":
+            if self.target_floor == "": # Can't find any target floor in my direction
+                self.direction = "no_assign"
+            # ------    Try to find target floor in all floors  -------# 
+            for bt in self.bt_list:
+                if self.bt_dic[bt].led and self.current_floor != bt: # if led is on and it's not current floor
+                    ###------  Found a floor to go !! -------###
+                    # update target floor
+                    self.target_floor = bt
+                    # update direction
+                    if self.bt_list.index(self.target_floor) - self.bt_list.index(self.current_floor) > 0: # go up
+                        self.direction = "up"
+                    else: # go down
+                        self.direction = "down"
     
-    #------- Check cmd from elevator_server ----------# 
-    if cmd_list != []: # New cmd to do 
-        cmd = str(cmd_list[0]).split()
-        del cmd_list[0]
+    def opened_timer_cb(self):
+        '''
+        Reach OPEN_DOOR_LOCK time, should close the door now.
+        '''
+        self.timer = None # Reset timer
+        self.state = "closing"
 
-        # ------- Write Cmd --------#
-        if cmd[0] == 'w': 
-            if cmd[1] in pb_dic and (cmd[2] == '1' or cmd[2] == '0' ): 
-                print str(cmd) 
-                pb_dic[cmd[1]].switch = int(cmd[2])
-        # ------- Read  Cmd --------#  
-        elif cmd[0] == 'r':
-            if cmd[1] in pb_dic: 
-                ans = pb_dic[cmd[1]].led
-                reply_pub.publish(str(ans))
-        else: # Error cmd 
-            pass 
+    def main(self): # main loop 
+        #------- Check cmd from elevator_server ----------# 
+        # if not self.queue.empty(): # New cmd to do 
+        try: 
+            cmd = self.mq_recv.receive()[0].decode().split() # non-blocking receiver
+        #cmd = self.queue.get().decode().split()# pop out one cmd to do 
+        except posix_ipc.BusyError:
+            pass # queue empty
+        else:
+            print ("cmd:" + str(cmd))
+            # ------- Write Cmd --------#(toggle switch)
+            if cmd[0] == 'w':
+                if cmd[1] in self.bt_dic and (cmd[2] == '1' or cmd[2] == '0'):
+                    self.bt_dic[cmd[1]].switch_server = int(cmd[2])
+            # ------- Read  Cmd --------#  
+            elif cmd[0] == 'r':
+                if cmd[1] in self.bt_dic:
+                    ans = self.bt_dic[cmd[1]].led
+                    # Output ans through IPC 
+                    print ("reply:" + str(ans))
+                    # self.mqtt_ipc.publish(topic = "/simu_IPC/reply" , payload = str(ans), qos = 0, retain = True)
+                    try:
+                        self.mq_send.send(str(ans), priority=9)
+                    except posix_ipc.BusyError: # queue full
+                        pass 
+            else: # Error cmd 
+                pass 
+        
+        # Privilage switch server 
+        for bt_key in self.bt_dic:
+            if self.bt_dic[bt_key].switch_server: # privilage switch is on! 
+                self.bt_dic[bt_key].switch = 1 
 
-    #------  Key board detection -----# 
-    key=""
-    try:                 
-        win.nodelay(True)
-        key = win.getkey()
-        if key == 'o':
-            pb_dic['open'].switch = 1
-        elif key == 'c':
-            pb_dic['close'].switch = 1
-        elif key == 'q':
-            is_running_simu = False # Exit 
+
+        #-----  Turn on led if switch is on -------# 
+        for bt in self.bt_dic: 
+            #if bt == self.current_floor:
+            #    continue
+            if  self.bt_dic[bt].switch == 1:
+                self.bt_dic[bt].led = 1
+
+        #-----   Check if any floor button is on -------# 
+        is_floor_LED = False
+        for bt in self.bt_dic:
+            if bt != 'open' and bt != 'close' and self.bt_dic[bt].led == 1:
+                is_floor_LED = True
+        
+        ########################
+        ###   State Machine  ###
+        ########################
+        if self.state == "standing_by":
+            if self.bt_dic['open'].switch == 1 : # switch to "opening" state
+                self.state = "opening"
+            if is_floor_LED:
+                self.plan()
+                self.LED_cancel_wrong_floor()
+                if self.target_floor != "":
+                    self.state = "moving"
+                else: # No avalible floor to go
+                    pass 
+        elif self.state == "opening":
+            if self.bt_dic['close'].switch == 1 :
+                self.state = "closing"
+            
+            # Opening Counting
+            if self.door_sensor < DOOR_SENSOR_MAX:#  Keep opening door. 
+                self.door_sensor += self.OPENING_VEL
+                self.cartoon_move_door(-self.CARTOON_DOOR_OPENING_VEL)
+
+            elif self.door_sensor >= DOOR_SENSOR_MAX :#if door is fully open,  switch to "opened" state
+                self.door_sensor = DOOR_SENSOR_MAX
+                self.timer = threading.Timer(OPEN_LOCK_TIME,self.opened_timer_cb)
+                self.timer.start()
+                self.state = "opened"
+        elif self.state == "opened":
+            if self.bt_dic['open'].switch == 1 : # Reset opening timer
+                self.timer.cancel()
+                self.timer = threading.Timer(OPEN_LOCK_TIME,self.opened_timer_cb)
+                self.timer.start()
+            elif self.bt_dic['close'].switch == 1 : # Switch to closing
+                self.timer.cancel()
+                self.bt_dic['open'].led = 0
+                self.state = "closing"
+        elif self.state == "closing":
+            if self.bt_dic['open'].switch == 1 : #Reset opening counter
+                self.state = "opening"
+            
+            if self.door_sensor > 0: # Keep closing door 
+                self.door_sensor -= self.CLOSING_VEL
+                self.cartoon_move_door(self.CARTOON_DOOR_OPENING_VEL)
+            elif self.door_sensor <= 0: # Switch to "moving state" or "standing_by "
+                self.door_sensor = 0 
+                # TODO I think its OK to switch to "standing_by first"
+
+                if is_floor_LED: # switch to moving
+                    self.plan() # get target_floor and direction
+                    if self.target_floor == "" :# nasty exception TODO
+                        self.direction = "no_assign"
+                        self.plan()
+                    self.LED_cancel_wrong_floor()
+                    if self.target_floor != "" : # 
+                        self.state = "moving"
+                    else : # No avalible floor to go
+                        self.direction = "no_assign"
+                        self.state = "standing_by"
+                
+                else: # switch to standing_by
+                    self.bt_dic['close'].led = 0
+                    self.direction = "no_assign"
+                    self.state = "standing_by"
+        elif self.state == "moving":
+            # keep moving
+            if self.direction == "up":# elevator asending
+                self.ev_location_sensor += self.MOVING_VEL
+                self.cartoon_move_ev(-self.CARTOON_EV_MOVING_VEL)
+            elif self.direction == "down":# elevator desending
+                self.ev_location_sensor -= self.MOVING_VEL
+                self.cartoon_move_ev(self.CARTOON_EV_MOVING_VEL)
+
+            d   = EV_LOCATION_MAX/(len(self.bt_list)-1)# divisor
+            q   = int(self.ev_location_sensor  //d)# quotient
+            r   =     self.ev_location_sensor  % d # reminder
+
+            if r >= 0 and r <= self.MOVING_VEL*1.1:# ev is passing a floor rightnow
+                self.current_floor = self.bt_list[q]
+            
+            # Check if target_floor arrived.
+            if self.current_floor == self.target_floor: #  elevator Arrived !!! settlement_LED, and switch to "opening" state
+                self.LED_cancel_wrong_floor() #  Erase dirrent direction and 
+                self.bt_dic[self.target_floor].led = 0
+                self.target_floor = "" # DON"T RESET DIRECTION
+                self.state = "opening"
+        
+        # Add this block to sim shandi Ev
+        # open and close directly indicate ev state 
+        if self.state == "opening" :
+            self.bt_dic['open'].led = 1
+            self.bt_dic['close'].led = 0
+        elif self.state == "closing":
+            self.bt_dic['open'].led = 0
+            self.bt_dic['close'].led = 1
+        else:
+            self.bt_dic['open'].led = 0
+            self.bt_dic['close'].led = 0
+        
+        # speical treat to current floor button, elevator server use this led pattern to 
+        # determine weather ev arrive target floor 
+        bt = self.bt_dic[self.current_floor]
+        if bt.switch == 1 and self.state != "moving": # Don't cancel any led at moving state
+            bt.led = 1 # sustain led light for LED_SUSTAIN_TIME sec 
+            t = threading.Timer(LED_SUSTAIN_TIME, self.led_sustain_timer_cb, args=[bt])
+            t.start()
+
+        #------- Reset switch -------# I trust these switch has been used.
+        for bt in self.bt_dic:
+            self.bt_dic[bt].switch = 0 
+
+        #############################
+        ###   Show Floor canvas   ###
+        #############################
+        '''
+        current_floor  show on floor canvas
+        '''
+        self.window.after(0,self.change_pic_canvas_floor(self.bt_dic[self.current_floor].pic_path))
+        
+        #############################
+        ###   Show state canvas   ###
+        #############################
+        if self.state == "opened":
+            self.window.after(0,self.change_pic_canvas_state("pic/open_4.jpeg"))
+        elif self.state == "standing_by":
+            self.window.after(0,self.change_pic_canvas_state("pic/blank.jpeg"))
+        elif self.state == "opening": # opening animation
+            self.canvas_animate(EV_STATE_CANVAS_PERIOD , ["pic/open_1.jpeg",\
+                                                          "pic/open_2.jpeg",\
+                                                          "pic/open_3.jpeg",\
+                                                          "pic/open_4.jpeg"])
+        elif self.state == "closing":# closing animation
+            self.canvas_animate(EV_STATE_CANVAS_PERIOD , ["pic/close_1.jpeg",\
+                                                          "pic/close_2.jpeg",\
+                                                          "pic/close_3.jpeg",\
+                                                          "pic/close_4.jpeg"])
+        elif self.state == "moving":
+            if self.direction == "up":
+                self.canvas_animate(EV_STATE_CANVAS_PERIOD , ["pic/up_1.jpeg",\
+                                                              "pic/up_2.jpeg",\
+                                                              "pic/up_3.jpeg"])
+            elif self.direction == "down":
+                self.canvas_animate(EV_STATE_CANVAS_PERIOD , ["pic/down_1.jpeg",\
+                                                              "pic/down_2.jpeg",\
+                                                              "pic/down_3.jpeg"])
         else:
             pass
-        #--- Check floor -----# 
-        for i in pb_dic:
-            try: 
-                if key == i:
-                    pb_dic[i].switch = 1
-            except: 
-                pass   
-        # win.clear()                
-        # win.addstr("Detected key:")
-        # win.addstr(str(key))
-        if key == os.linesep:
-            return            
-    except Exception as e:
-        # No input   
-        pass 
+        
+        ###########################
+        ###   Show LED Status   ###
+        ###########################
+        '''
+        If led = 1  ->  button highlight
+        If led = 0  ->  button don't highlight
+        '''
+        for bt_key in self.bt_dic:
+            bt = self.bt_dic[bt_key]
+            if bt.led == 1: # led of button is on 
+                bt.bt.configure(bg = BUTTON_HIGHLIGHT_COLOR)
+                bt.bt.configure(activebackground = bt.bt.cget('background'))
+            else: # led of button is off 
+                bt.bt.configure(bg = BUTTON_COLOR)
+                bt.bt.configure(activebackground = bt.bt.cget('background'))
+        
+        ###########################
+        ###   Text show state   ###
+        ###########################
+        self.text.delete(1.0,tk.END)
+        self.text.insert("insert","state :" + self.state + '\n')
+        self.text.insert("insert","direction :" + self.direction + '\n')
+        self.text.insert("insert","current floor :" + self.current_floor+ '\n')
+        self.text.insert("insert","target  floor :" + self.target_floor + '\n')
+        
+        #----- Recursive call main() --------# 
+        self.window.after(int(LOOP_PERIOD*1000),self.main)
+
+
+    def led_sustain_timer_cb(self, bt):
+        bt.led = 0
+
+    def canvas_animate(self,period,pic_list):
+        '''
+        create a animate on canvas
+        Input : 
+            period : value , how long will it take to go thought whole animation
+            pic_list : str , picture path that will play in sequence.
+        Dependence : 
+            self.animate_counter 
+        '''
+        num_pic = len(pic_list)
+        self.animate_counter += 1
+        try: 
+            pic_path = pic_list[self.animate_counter//(period//num_pic)]
+        except: # counter exceed period, Reset !!
+            self.animate_counter = 0
+        else:
+            self.window.after(0,self.change_pic_canvas_state(pic_path))
+
+    def change_pic_canvas_floor(self,new_pic_path):
+        '''
+        Change picture inside canvas_floor to new picture
+        Input : 
+            new_pic_path : str , new picture path 
+        '''
+        self.img_floor =  ImageTk.PhotoImage(Image.open(new_pic_path).resize((35,50), Image.ANTIALIAS))
+        self.canvas_floor.create_image (27,30,anchor = 'center', image = self.img_floor) # where to put pic on canvas
+
+    def change_pic_canvas_state(self,new_pic_path):
+        '''
+        Change picture inside canvas_state to new picture
+        Input : 
+            new_pic_path : str , new picture path 
+        '''
+        self.img_arrow =  ImageTk.PhotoImage(Image.open(new_pic_path).resize((50,50), Image.ANTIALIAS))
+        self.canvas_state.create_image (27,30,anchor = 'center', image = self.img_arrow) # where to put pic on canvas
     
-    for i in pb_dic:  # // default to be record
-        if pb_dic[i].name == str(current_floor):
-            continue
-        if pb_dic[i].switch == 1:
-            pb_dic[i].led = 1
-
-    is_floor_LED = False
-    for i in pb_dic: 
-        if pb_dic[i].name != 'open' and pb_dic[i].name != 'close' and pb_dic[i].led == 1:
-            is_floor_LED = True
+    def cartoon_move_ev(self,increment):
+        '''
+        Moving elevator by one increment 
+        Input :
+            increment : positive ->  moving down
+                        negative ->  moving up
+        '''
+        self.canvas_cartoon.move(self.ev        , 0, increment)
+        self.canvas_cartoon.move(self.left_door , 0, increment)
+        self.canvas_cartoon.move(self.right_door, 0, increment)
     
-    ########################
-    ###   State Machine  ###
-    ########################
-    if state == "standing_by":
-        if pb_dic['open'].switch == 1 : # // switch to "opening" state
-            resetCounter()
-            state = "opening"
-        elif pb_dic['close'].switch == 1 : # if (switch_close)
-            pass #  // do nothing
-        if is_floor_LED: 
-            plan()
-            LED_cancel_wrong_floor()
-            if target_floor != 0:
-                state = "moving"
-            else: # {;}// # No avalible floor to go
-                pass 
-    elif state == "opening":
-        if pb_dic['open'].switch == 1 :
-            pass 
-            # {;} // do nothing
-        elif pb_dic['close'].switch == 1 :
-            resetCounter()
-            state = "closing" # // do nothing
-        if is_floor_LED:
-            pass # // Record LED, but do nothing
-        # Opening Counting
-        if door_counter < DOOR_COUNTER_MAX:#   // Keep opening door. 
-            door_counter += OPENING_VEL
-        elif door_counter >= DOOR_COUNTER_MAX :# //if door is finished open,  switch to "opened" state
-            door_counter = DOOR_COUNTER_MAX
-            resetCounter()
-            state = "opened"
-
-    elif state == "opened":
-        if pb_dic['open'].switch == 1 : # { // Reset opening counter
-            open_lock_counter = 0
-        elif pb_dic['close'].switch == 1 : #  // Switch to closing
-            pb_dic['open'].led = 0
-            resetCounter()
-            state = "closing"
-        if is_floor_LED:
-            pass # {;} // Record LED, but do nothing
-        if open_lock_counter < OPEN_LOCK_TIME: #  // Keep wait. 
-            open_lock_counter += 1
-        else:# // switch to closing
-            pb_dic['open'].led = 0
-            resetCounter()
-            state = "closing"
-    
-    elif state == "closing":
-        if pb_dic['open'].switch == 1 : # // Reset opening counter
-            resetCounter()
-            state = "opening"
-        elif pb_dic['close'].switch == 1 : #  //Do nothing
-            pass
-        if is_floor_LED : 
-            pass # Record LED, but do nothing
-        if door_counter > 0: #  // Keep closing door 
-            door_counter -= CLOSING_VEL
-        elif door_counter <= 0: # Switch to "moving state" or "standing_by "
-            door_counter = 0 
-            resetCounter()
-            if is_floor_LED: #  //# switch to moving
-                plan() # ; // get target_floor and direction
-                if target_floor == 0 :# )// nasty exception TODO
-                    direction = "no_assign"
-                    plan()
-                LED_cancel_wrong_floor()
-                if target_floor != 0 : # 
-                    state = "moving"
-                else : # // # No avalible floor to go
-                    direction = "no_assign"
-                    state = "standing_by"
-            else: #  // switch to standing_by
-                pb_dic['close'].led = 0
-                direction = "no_assign"
-                state = "standing_by"
-    elif state == "moving":
-            if pb_dic['open'].switch == 1 : #  // # do nothing
-                pass # {;}
-            elif pb_dic['close'].switch == 1 : #  // do nothing
-                pass # {;}
-            if is_floor_LED: #  // # TODO : Record LED, Middle way interupt!!
-                pass # {;}
-            if next_floor_counter < NEXT_FLOOR_TIME: #  // #Keep going 
-                next_floor_counter += 1
-            else : # //# reached a new floor
-                resetCounter()
-                # // change current_floor
-                if direction == "up": # ){
-                    current_floor += 1
-                elif direction == "down" : 
-                    current_floor -= 1
-                # // Check if target_floor arrived.
-                if current_floor == target_floor: #  //: # elevator Arrived !!! settlement_LED, and switch to "opening" state
-                    LED_cancel_wrong_floor() # // # Erase dirrent direction and 
-                    pb_dic[str(target_floor)].led = 0
-                    target_floor = 0 # ; // DON"T RESET DIRECTION
-                    state = "opening"
-                else: # need to go to next floor.
-                    pass # {;}
-    
-    #################################
-    ###  Simulation to shandi EV  ###
-    #################################
-    # //Add this block to sim shandi Ev, open and close 
-    if state == "opening" :
-        pb_dic['open'].led = 1
-        pb_dic['close'].led = 0
-    elif state == "closing":
-        pb_dic['open'].led = 0
-        pb_dic['close'].led = 1
-    else:
-        pb_dic['open'].led = 0
-        pb_dic['close'].led = 0
-    
-    # // Add this block to sim shangdi ev, current floor cancel led
-    if pb_dic[str(current_floor)].switch == 1: # switch_arr[current_floor] == 1:
-        pb_dic[str(current_floor)].led = 1
-        exting_count = 1
-    if exting_count > 0 and exting_count < 150:
-        pb_dic[str(current_floor)].led = 1
-        exting_count += 1
-    elif exting_count >= 150: # // 1.5 sec 
-        pb_dic[str(current_floor)].led = 0
-        exting_count = 0
-
-    #############################################
-    ###  Draw out ev information at terminal  ###
-    #############################################
-    win.clear()
-
-    #--------- Print out basic info. of EV ------------# 
-    win.addstr(0,0,"state : "+ state)
-    win.addstr(1,0,"direction : "+ direction)
-    win.addstr(2,0, "target_floor : "+ str(target_floor))
-    win.addstr(3,0 ,"current_floor")
-
-    #---------  dazzling LED  display -----------#  
-    seven_section_led = numpy.array([[0,0,0,0,0], [0,0,0,0,0] ,[0,0,0,0,0] ,[0,0,0,0,0] ,[0,0,0,0,0]])
-    if current_floor == 1 :
-        seven_section_led_set([3,6],seven_section_led )
-    elif current_floor == 2:
-        seven_section_led_set([1,3,4,5,7],seven_section_led )
-    elif current_floor == 3:
-        seven_section_led_set([1,3,4,6,7],seven_section_led )
-    elif current_floor == 4:
-        seven_section_led_set([2,4,3,6],seven_section_led )
-    seven_section_led_msg = "" 
-    for i in seven_section_led:
-        for j in i:
-            if j == 0:
-                seven_section_led_msg += " "
-            else: 
-                seven_section_led_msg += "*"
-        seven_section_led_msg += '\n'
-    win.addstr(4,0, seven_section_led_msg)
-    
-    #---------   Draw door -----------# 
-    DOOR_WIDTH = 50  # Must be odd.
-    DOOR_LENTH = 10
-    msg_door = ""
-    #---- Cal door position ----# 
-    door_pos = int(round((1 - door_counter / float(DOOR_COUNTER_MAX)) * ( DOOR_WIDTH / 2 - 1))) + 1
-
-    # -------   Left -----------#
-    l_msg = ""
-    for j in range(DOOR_WIDTH /2 + 1): # Left 
-        if j == 0 : # Leftest
-            l_msg += "|"
-        elif j == door_pos: 
-            l_msg += "$"
-        else:  
-            l_msg += " "
-    # -------   Right -----------#  # right is sysmatrix to left 
-    r_msg = l_msg[::-1] # Reverse string 
-    #--------   End of line -----# 
-    msg_door += l_msg + r_msg
-
-    for i in range(DOOR_LENTH): # How many line 
-        win.addstr(10+i, 7, msg_door)
-    
-
-    ######################
-    ###   LED Status   ###
-    ######################
-    pb_sort = [(k,pb_dic[k]) for k in sorted(pb_dic.keys())]
-    count  = 0 
-    for i in pb_sort:
-        if i[1].led: 
-            win.addstr (13+count,68,i[0] + " *")
-        else:  
-            win.addstr (13+count,68,i[0])
-        count += 1
-    ###########################
-    ###  Update pre state   ###
-    ###########################
-    #pre_state = state
-    #pre_current_floor = current_floor
-    #pre_target_floor = target_floor
-    #pre_direction = direction
-    #pre_pb_dic = pb_dic
-
-def ev_sim_cmd_CB(msg):
-    '''
-    Call back function of topic '/ev_sim/cmd'
-    '''
-    cmd_list.append(msg.data)
+    def cartoon_move_door(self,increment):
+        '''
+        Opening door or Closing door by one increment 
+        Input :
+            increment : positive ->  close door 
+                        negative ->  open  door
+        '''
+        # Increment left door 
+        an1_x, an1_y, an2_x, an2_y = self.canvas_cartoon.coords(self.left_door)
+        an2_x += increment
+        self.canvas_cartoon.coords(self.left_door, an1_x, an1_y, an2_x, an2_y)
+        # Increment right door 
+        an1_x, an1_y, an2_x, an2_y = self.canvas_cartoon.coords(self.right_door)
+        an1_x -= increment
+        self.canvas_cartoon.coords(self.right_door, an1_x, an1_y, an2_x, an2_y)
 
     
-if __name__ == '__main__':
-    rospy.init_node('elevator_simulator')
-    rospy.Subscriber('ev_sim/cmd', String, ev_sim_cmd_CB)
-    reply_pub = rospy.Publisher('ev_sim/reply', String, queue_size=10)
-    # curses.wrapper(main)
-    r = rospy.Rate(100.0)
-    stdscr = curses.initscr()
-    win = curses.newwin(100, 100, 0, 0)
-    while not rospy.is_shutdown():
-        main(win)
-        r.sleep()
-
+    ######################################
+    ###   buttons callback fucntion    ###
+    ######################################
+    def cb_bt_1f(self):
+        self.bt_dic['1'].switch = 1
+    def cb_bt_2f(self):
+        self.bt_dic['2'].switch = 1
+    def cb_bt_3f(self):
+        self.bt_dic['3'].switch = 1
+    def cb_bt_4f(self):
+        self.bt_dic['4'].switch = 1
+    def cb_bt_open(self):
+        self.bt_dic['open'].switch = 1
+    def cb_bt_close(self):
+        self.bt_dic['close'].switch = 1
+app()

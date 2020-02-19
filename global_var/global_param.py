@@ -1,6 +1,6 @@
 import os 
 import yaml
-from global_logger import logger
+from global_var.global_logger import logger
 from pprint import pprint, pformat
 
 # Load parameters

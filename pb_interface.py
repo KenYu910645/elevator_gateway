@@ -2,10 +2,9 @@ import time
 import yaml
 import serial
 from global_var.global_logger import logger
-from global_var.global_param import REC_TIMEOUT, IS_VERBOSE, table, IS_SIMULATION
+from global_var.global_param import REC_TIMEOUT, IS_VERBOSE, table, IS_SIMULATION,BROKER_IP
 if IS_SIMULATION:
-    import rospy 
-    from std_msgs.msg import String
+    import posix_ipc
 # Data receiving
 START_CHAR = '['
 END_CHAR = ']'
@@ -19,32 +18,35 @@ class PB_interface_simu():
     This interface is for elevator simulation only.
     '''
     def __init__(self):
-        rospy.Subscriber('ev_sim/reply', String, self.ev_sim_reply_CB)
-        self.cmd_pub = rospy.Publisher('ev_sim/cmd', String, queue_size=10)
-        self.reply_buf = []
-
-    def ev_sim_reply_CB(self, msg): # simulation CB
-        self.reply_buf.append(msg.data)
-        # print msg.data
+        self.mq_recv = posix_ipc.MessageQueue('/simu_IPC_reply', posix_ipc.O_CREAT)
+        self.mq_recv.block = False # non-blocking recv , send
+        self.mq_send = posix_ipc.MessageQueue('/simu_IPC_cmd'  , posix_ipc.O_CREAT)
+        self.mq_send.block = False # non-blocking recv , send
+    
     def EVledWrite(self, key, d, retryTime=3):
         if d=="high":
             sendBuff = "w " + str(key) + " 1"
         elif d=="low":
             sendBuff = "w " + str(key) + " 0"
-        self.cmd_pub.publish(sendBuff)
+        try:
+            self.mq_send.send(sendBuff, priority = 9)
+        except posix_ipc.BusyError: # queue full
+            pass 
         return 'G'
     def EVledRead(self, key, retryTime=3):
-        self.cmd_pub.publish("r " + str(key))
+        try : 
+            self.mq_send.send("r " + str(key), priority = 9)
+        except posix_ipc.BusyError: # queue full
+            return -1 # Error queue full 
         # Wait for answer for 1 sec. 
         t_start_wait = time.time()
         while time.time()  - t_start_wait < 1: # 1 sec 
-            if self.reply_buf == []:
-                pass # Keep waiting 
-            else: 
-                # Pop out an anw from reply_buffer
-                ans = self.reply_buf[0]
-                del self.reply_buf[0]
-                return int(ans)
+            try:
+                r = self.mq_recv.receive()
+            except posix_ipc.BusyError:
+                pass # queue empty, keep waiting
+            else: # Get msg
+                return int(r[0])
         return -1 # Error , timeout 
 
 class PB_interface():

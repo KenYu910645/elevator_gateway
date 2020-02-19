@@ -2,10 +2,10 @@
 import os
 import sys
 import time
-import serial
 import json
 import signal
 import threading
+import subprocess # For simulation 
 from cmd_struct import cmdStruct
 from global_var.global_logger import logger
 from elevator_cmd import ElevatorCmd
@@ -14,14 +14,13 @@ from global_var.global_param import table, IS_SIMULATION, IS_USING_MQTT, AMR_MQT
 #---- weixin alarm to cell phone -----# 
 if is_using_rss: 
     from weixin_alarm import alarm
-
 #---- XBEE globaly import -----# 
 if IS_USING_XBEE:
     from global_var.global_xbee import xbee_obj 
     # os.system("pppd /dev/xbee 9600 lock nodetach noauth crtscts mtu 576 persist maxfail 0 holdoff 1 195.0.0.13:195.0.0.12")
 #---- EV simulation on ROS ---# 
 if IS_SIMULATION:
-    import rospy 
+    # import rospy 
     from std_msgs.msg import String
 #----- MQTT globaly import -----# 
 if IS_USING_MQTT:
@@ -255,17 +254,20 @@ if IS_USING_XBEE:
         else: 
             logger.error("[MQTT_cmd_CM] unknow cmd ") 
 
-        
 if IS_USING_MQTT:
     def mqtt_cmd_CB(client, userdata, message):
         '''
-        This is a cmd_CB from MQTT subscribe topic 
+        This is a cmd_CB from MQTT subscribe topic
         '''
         logger.info("[MQTT] cmd_CB :  " + str(message.payload) + "(Q" + str(message.qos) + ", R" + str(message.retain) + ")")
         # Parse payload and Add task to req_list[]
-        cmd_dict = json.loads(message.payload)
+        try: 
+            cmd_dict = json.loads(message.payload.decode())
+        except:
+            logger.error("[MQTT_cmd_CM] invalid cmd formet ")
+            return 
         # ------ Utility cmd ------# 
-        if  cmd_dict['cmd'] == 'open':
+        if   cmd_dict['cmd'] == 'open':
             Ele_Ser.open(cmd_dict['robot_id'], cmd_dict['tid'])
         elif cmd_dict['cmd'] == 'close':
             Ele_Ser.close(cmd_dict['robot_id'], cmd_dict['tid'])
@@ -296,7 +298,8 @@ if IS_USING_MQTT:
         elif cmd_dict['cmd'] == 'weixin_test':
             Ele_Ser.weixin_test()
         else: 
-            logger.error("[MQTT_cmd_CM] unknow cmd ") 
+            logger.error("[MQTT_cmd_CM] good cmd forment, but don't know this cmd.") 
+
         
 if IS_USING_HTTP: 
     class cherrypy_cmd_CB(object):
@@ -402,13 +405,13 @@ signal.signal(signal.SIGINT, sigint_handler)
 signal.signal(signal.SIGHUP, sigint_handler)
 signal.signal(signal.SIGTERM, sigint_handler)
 
+#def IPC_CB(client, userdata, message):
+#    print (message)
+
 if __name__ == '__main__':
-    #----- Simulation on ROS -----#
+    #----- Simulation -----#
     if IS_SIMULATION:
-        # Dark Magic
-        os.system("gnome-terminal -e 'rosrun elevator_gateway elevator_simulator.py'")
-        os.system("gnome-terminal -e 'roscore'") # ROS Master 
-        rospy.init_node('elevator_server')
+        pass 
     if IS_USING_MQTT:
         # ------- Subcriber  ----------#
         sub_list = [] 

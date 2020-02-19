@@ -13,7 +13,7 @@ AMR_URI : 'http://192.168.30.48:6060/'
 
 # ----------  For MQTT ------------# 
 AMR_MQTT_NAME: ["AMR250_TEST"]  # TODO 
-BROKER_IP: "iot.eclipse.org" # TODO 
+BROKER_IP: "mqtt.eclipse.org" # TODO 
 #BROKER_IP: "192.168.30.101" # Office test 
 #BROKER_IP: "192.168.64.10" # Office test 
 CLIENT_NAME : "elevator_server" # [DON"T MODIFIED]
@@ -36,10 +36,10 @@ FLOOR_LED_CONFIRMATION_MAX_TIME : [ 2, 2 ] # TODO
 FLOOR_LED_CONFIRMATION_MIN_TIME : [ 0.5, 0.5 ] # TODO 
 DOOR_OPEN_LIMIT_TIME: 60.0 #sec # MAX time that door can keep open, after that, timeout_release.
 WAIT_REACH_LIMIT_TIME: 300.0 #sec # MAX time that wait for EV to reach assign floor.
-IS_SIMULATION: False # Switch to True if you want to simulate in ROS system
+IS_SIMULATION: True # Switch to True if you want to simulate in ROS system
 # ------ Notify Protocal Choose --------# 
 IS_USING_MQTT: True
-IS_USING_HTTP: True
+IS_USING_HTTP: False
 IS_USING_XBEE: False 
 #------- Door Status Verify ------# 
 ENABLE_VERIFY_DOOR_STATUS: False #[TODO] Shandi is True
