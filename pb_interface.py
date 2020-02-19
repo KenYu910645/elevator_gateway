@@ -33,6 +33,7 @@ class PB_interface_simu():
         except posix_ipc.BusyError: # queue full
             pass 
         return 'G'
+    
     def EVledRead(self, key, retryTime=3):
         try : 
             self.mq_send.send("r " + str(key), priority = 9)

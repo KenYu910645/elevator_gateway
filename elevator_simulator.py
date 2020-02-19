@@ -140,12 +140,13 @@ class app():
         gap          = 5  # gap width between elevator and elevator well
         canvas_edge  = 3  # gap width between elevator well and canvas edge
         floor_thick  = 5  # thickness of floor
+        
         # location of amr, change in runtime (animation)
         self.amr_location_x = 0
         self.amr_location_y = 0
         
         ev_well_width  = 2*gap + ev_width
-        ev_well_height = total_height - canvas_edge # - 2*gap
+        ev_well_height = total_height - canvas_edge
         ev_well_x = total_width - ev_well_width - canvas_edge
         
         max_ev_movement = ev_well_height - ev_height - 2*gap
@@ -176,8 +177,6 @@ class app():
         # These doors should tranvel along with elevator 
         self.left_door  = self.canvas_cartoon.create_rectangle(ev_an1[0],ev_an1[1], ev_an1[0] + ev_width/2  ,ev_an2[1], fill = "brown")
         self.right_door = self.canvas_cartoon.create_rectangle(ev_an2[0],ev_an1[1], ev_an1[0] + ev_width/2  ,ev_an2[1], fill = "brown")
-        self.tmp_ori_1 = ev_an1[0]
-        self.tmp_ori_2 = ev_an2[0]
         
         #----------   Draw amr  ----------#
         self.amr_location_x = total_width/2 -100
@@ -224,8 +223,7 @@ class app():
             for bt_key in self.bt_list:
                 if bt_key != self.current_floor:
                     self.bt_dic[bt_key].led = 0
-                    
-
+    
     def plan(self):
         '''
         To get direction and target floor
@@ -271,7 +269,13 @@ class app():
         '''
         self.timer = None # Reset timer
         self.state = "closing"
-
+    
+    def led_sustain_timer_cb(self, bt):
+        '''
+        Current floor led will sustain a bit while after being pressed
+        '''
+        bt.led = 0
+    
     def main(self): # main loop 
         #------- Check cmd from elevator_server ----------# 
         # if not self.queue.empty(): # New cmd to do 
@@ -494,9 +498,6 @@ class app():
         #----- Recursive call main() --------# 
         self.window.after(int(LOOP_PERIOD*1000),self.main)
 
-
-    def led_sustain_timer_cb(self, bt):
-        bt.led = 0
 
     def canvas_animate(self,period,pic_list):
         '''

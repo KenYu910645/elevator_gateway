@@ -45586,3 +45586,143 @@
 
 [2020-02-19 10:24:12,619] INFO: [release_button]
 [2020-02-19 10:25:17,553] WARNING: [sigint_handler] catched interrupt signal!
+[2020-02-19 13:21:52,685] INFO: [param_loader] table = {'1': [1, 3],
+ '2': [1, 7],
+ '3': [1, 8],
+ '4': [1, 9],
+ 'close': [1, 1],
+ 'open': [1, 2]}
+[2020-02-19 13:21:52,685] INFO: [param_loader] AMR_URI = http://192.168.30.48:6060/
+[2020-02-19 13:21:52,685] INFO: [param_loader] AMR_MQTT_NAME = ['AMR250_TEST']
+[2020-02-19 13:21:52,686] INFO: [param_loader] AMR_MQTT_NAME = elevator_server
+[2020-02-19 13:21:52,686] INFO: [param_loader] BROKER_IP = mqtt.eclipse.org
+[2020-02-19 13:21:52,686] INFO: [param_loader] NOTIFY_MAX_RETRY_TIME = 60
+[2020-02-19 13:21:52,686] INFO: [param_loader] REC_TIMEOUT = 0.1
+[2020-02-19 13:21:52,686] INFO: [param_loader] IS_VERBOSE = False
+[2020-02-19 13:21:52,686] INFO: [param_loader] IS_SIMULATION = True
+[2020-02-19 13:21:52,686] INFO: [param_loader] DOOR_OPEN_LIMIT_TIME = 60.0
+[2020-02-19 13:21:52,686] INFO: [param_loader] WAIT_REACH_LIMIT_TIME = 300.0
+[2020-02-19 13:21:52,686] INFO: [param_loader] SLIENCE_MIN_COUNTER = 5
+[2020-02-19 13:21:52,686] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MAX_TIME = [2, 2]
+[2020-02-19 13:21:52,687] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MIN_TIME = [0.5, 0.5]
+[2020-02-19 13:21:52,687] INFO: [param_loader] WAIT_DOOR_LIMIT = 20
+[2020-02-19 13:21:52,687] INFO: [param_loader] is_using_rss = False
+[2020-02-19 13:21:52,687] INFO: [param_loader] IS_USING_MQTT = True
+[2020-02-19 13:21:52,687] INFO: [param_loader] IS_USING_HTTP = False
+[2020-02-19 13:21:52,687] INFO: [param_loader] IS_USING_XBEE = False
+[2020-02-19 13:21:52,687] INFO: [param_loader] CORP_ID = ww0692f024800a89da
+[2020-02-19 13:21:52,687] INFO: [param_loader] CORP_SECRET = aKA9FsvaU02m5UH4uuYKOq3KGcud2UqXDJoaPhlzDjg
+[2020-02-19 13:21:52,687] INFO: [param_loader] AGENT_ID = 1000005
+[2020-02-19 13:21:52,687] INFO: [param_loader] ENABLE_VERIFY_DOOR_STATUS = False
+[2020-02-19 13:21:52,687] INFO: [param_loader] CLOSE_EYE_WAIT_DOOR_SEC = 3
+[2020-02-19 13:21:52,688] INFO: [param_loader] XBEE_HOST_IP = 195.0.0.13
+[2020-02-19 13:21:52,782] INFO: [param_loader] table = {'1': [1, 3],
+ '2': [1, 7],
+ '3': [1, 8],
+ '4': [1, 9],
+ 'close': [1, 1],
+ 'open': [1, 2]}
+[2020-02-19 13:21:52,782] INFO: [param_loader] AMR_URI = http://192.168.30.48:6060/
+[2020-02-19 13:21:52,782] INFO: [param_loader] AMR_MQTT_NAME = ['AMR250_TEST']
+[2020-02-19 13:21:52,783] INFO: [param_loader] AMR_MQTT_NAME = elevator_server
+[2020-02-19 13:21:52,783] INFO: [param_loader] BROKER_IP = mqtt.eclipse.org
+[2020-02-19 13:21:52,783] INFO: [param_loader] NOTIFY_MAX_RETRY_TIME = 60
+[2020-02-19 13:21:52,783] INFO: [param_loader] REC_TIMEOUT = 0.1
+[2020-02-19 13:21:52,783] INFO: [param_loader] IS_VERBOSE = False
+[2020-02-19 13:21:52,783] INFO: [param_loader] IS_SIMULATION = True
+[2020-02-19 13:21:52,783] INFO: [param_loader] DOOR_OPEN_LIMIT_TIME = 60.0
+[2020-02-19 13:21:52,783] INFO: [param_loader] WAIT_REACH_LIMIT_TIME = 300.0
+[2020-02-19 13:21:52,783] INFO: [param_loader] SLIENCE_MIN_COUNTER = 5
+[2020-02-19 13:21:52,783] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MAX_TIME = [2, 2]
+[2020-02-19 13:21:52,783] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MIN_TIME = [0.5, 0.5]
+[2020-02-19 13:21:52,784] INFO: [param_loader] WAIT_DOOR_LIMIT = 20
+[2020-02-19 13:21:52,784] INFO: [param_loader] is_using_rss = False
+[2020-02-19 13:21:52,784] INFO: [param_loader] IS_USING_MQTT = True
+[2020-02-19 13:21:52,784] INFO: [param_loader] IS_USING_HTTP = False
+[2020-02-19 13:21:52,784] INFO: [param_loader] IS_USING_XBEE = False
+[2020-02-19 13:21:52,784] INFO: [param_loader] CORP_ID = ww0692f024800a89da
+[2020-02-19 13:21:52,784] INFO: [param_loader] CORP_SECRET = aKA9FsvaU02m5UH4uuYKOq3KGcud2UqXDJoaPhlzDjg
+[2020-02-19 13:21:52,784] INFO: [param_loader] AGENT_ID = 1000005
+[2020-02-19 13:21:52,784] INFO: [param_loader] ENABLE_VERIFY_DOOR_STATUS = False
+[2020-02-19 13:21:52,784] INFO: [param_loader] CLOSE_EYE_WAIT_DOOR_SEC = 3
+[2020-02-19 13:21:52,784] INFO: [param_loader] XBEE_HOST_IP = 195.0.0.13
+[2020-02-19 13:21:52,999] INFO: [MQTT] Add_subscriber : [['AMR250_TEST/elevator_server/cmd', 2]]
+[2020-02-19 13:21:53,000] INFO: [main] Successfully boot elevator server
+[2020-02-19 13:23:38,403] WARNING: [sigint_handler] catched interrupt signal!
+[2020-02-19 14:16:03,400] INFO: [param_loader] table = {'1': [1, 3],
+ '2': [1, 7],
+ '3': [1, 8],
+ '4': [1, 9],
+ 'close': [1, 1],
+ 'open': [1, 2]}
+[2020-02-19 14:16:03,400] INFO: [param_loader] AMR_URI = http://192.168.30.48:6060/
+[2020-02-19 14:16:03,400] INFO: [param_loader] AMR_MQTT_NAME = ['AMR250_TEST']
+[2020-02-19 14:16:03,400] INFO: [param_loader] AMR_MQTT_NAME = elevator_server
+[2020-02-19 14:16:03,400] INFO: [param_loader] BROKER_IP = mqtt.eclipse.org
+[2020-02-19 14:16:03,400] INFO: [param_loader] NOTIFY_MAX_RETRY_TIME = 60
+[2020-02-19 14:16:03,400] INFO: [param_loader] REC_TIMEOUT = 0.1
+[2020-02-19 14:16:03,401] INFO: [param_loader] IS_VERBOSE = False
+[2020-02-19 14:16:03,401] INFO: [param_loader] IS_SIMULATION = True
+[2020-02-19 14:16:03,401] INFO: [param_loader] DOOR_OPEN_LIMIT_TIME = 60.0
+[2020-02-19 14:16:03,401] INFO: [param_loader] WAIT_REACH_LIMIT_TIME = 300.0
+[2020-02-19 14:16:03,401] INFO: [param_loader] SLIENCE_MIN_COUNTER = 5
+[2020-02-19 14:16:03,401] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MAX_TIME = [2, 2]
+[2020-02-19 14:16:03,401] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MIN_TIME = [0.5, 0.5]
+[2020-02-19 14:16:03,401] INFO: [param_loader] WAIT_DOOR_LIMIT = 20
+[2020-02-19 14:16:03,401] INFO: [param_loader] is_using_rss = False
+[2020-02-19 14:16:03,401] INFO: [param_loader] IS_USING_MQTT = True
+[2020-02-19 14:16:03,402] INFO: [param_loader] IS_USING_HTTP = False
+[2020-02-19 14:16:03,402] INFO: [param_loader] IS_USING_XBEE = False
+[2020-02-19 14:16:03,402] INFO: [param_loader] CORP_ID = ww0692f024800a89da
+[2020-02-19 14:16:03,402] INFO: [param_loader] CORP_SECRET = aKA9FsvaU02m5UH4uuYKOq3KGcud2UqXDJoaPhlzDjg
+[2020-02-19 14:16:03,402] INFO: [param_loader] AGENT_ID = 1000005
+[2020-02-19 14:16:03,402] INFO: [param_loader] ENABLE_VERIFY_DOOR_STATUS = False
+[2020-02-19 14:16:03,402] INFO: [param_loader] CLOSE_EYE_WAIT_DOOR_SEC = 3
+[2020-02-19 14:16:03,402] INFO: [param_loader] XBEE_HOST_IP = 195.0.0.13
+[2020-02-19 14:16:03,506] INFO: [param_loader] table = {'1': [1, 3],
+ '2': [1, 7],
+ '3': [1, 8],
+ '4': [1, 9],
+ 'close': [1, 1],
+ 'open': [1, 2]}
+[2020-02-19 14:16:03,506] INFO: [param_loader] AMR_URI = http://192.168.30.48:6060/
+[2020-02-19 14:16:03,506] INFO: [param_loader] AMR_MQTT_NAME = ['AMR250_TEST']
+[2020-02-19 14:16:03,506] INFO: [param_loader] AMR_MQTT_NAME = elevator_server
+[2020-02-19 14:16:03,506] INFO: [param_loader] BROKER_IP = mqtt.eclipse.org
+[2020-02-19 14:16:03,506] INFO: [param_loader] NOTIFY_MAX_RETRY_TIME = 60
+[2020-02-19 14:16:03,506] INFO: [param_loader] REC_TIMEOUT = 0.1
+[2020-02-19 14:16:03,506] INFO: [param_loader] IS_VERBOSE = False
+[2020-02-19 14:16:03,506] INFO: [param_loader] IS_SIMULATION = True
+[2020-02-19 14:16:03,506] INFO: [param_loader] DOOR_OPEN_LIMIT_TIME = 60.0
+[2020-02-19 14:16:03,506] INFO: [param_loader] WAIT_REACH_LIMIT_TIME = 300.0
+[2020-02-19 14:16:03,506] INFO: [param_loader] SLIENCE_MIN_COUNTER = 5
+[2020-02-19 14:16:03,506] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MAX_TIME = [2, 2]
+[2020-02-19 14:16:03,507] INFO: [param_loader] FLOOR_LED_CONFIRMATION_MIN_TIME = [0.5, 0.5]
+[2020-02-19 14:16:03,507] INFO: [param_loader] WAIT_DOOR_LIMIT = 20
+[2020-02-19 14:16:03,507] INFO: [param_loader] is_using_rss = False
+[2020-02-19 14:16:03,507] INFO: [param_loader] IS_USING_MQTT = True
+[2020-02-19 14:16:03,507] INFO: [param_loader] IS_USING_HTTP = False
+[2020-02-19 14:16:03,507] INFO: [param_loader] IS_USING_XBEE = False
+[2020-02-19 14:16:03,507] INFO: [param_loader] CORP_ID = ww0692f024800a89da
+[2020-02-19 14:16:03,507] INFO: [param_loader] CORP_SECRET = aKA9FsvaU02m5UH4uuYKOq3KGcud2UqXDJoaPhlzDjg
+[2020-02-19 14:16:03,507] INFO: [param_loader] AGENT_ID = 1000005
+[2020-02-19 14:16:03,507] INFO: [param_loader] ENABLE_VERIFY_DOOR_STATUS = False
+[2020-02-19 14:16:03,508] INFO: [param_loader] CLOSE_EYE_WAIT_DOOR_SEC = 3
+[2020-02-19 14:16:03,508] INFO: [param_loader] XBEE_HOST_IP = 195.0.0.13
+[2020-02-19 14:16:03,690] INFO: [MQTT] Add_subscriber : [['AMR250_TEST/elevator_server/cmd', 2]]
+[2020-02-19 14:16:03,691] INFO: [main] Successfully boot elevator server
+[2020-02-19 14:16:04,551] INFO: {'session present': 1}
+[2020-02-19 14:16:04,552] INFO: [MQTT] connect_CB: Connection Accepted.
+[2020-02-19 14:16:04,553] INFO: {'session present': 1}
+[2020-02-19 14:16:04,553] INFO: [MQTT] connect_CB: Connection Accepted.
+[2020-02-19 14:16:04,611] INFO: [MQTT] Add_subscriber : [['test/elevator_server/status', 2], ['test/elevator_server/reply', 2], ['elevator_server/available', 2]]
+[2020-02-19 14:16:05,230] INFO: [MQTT] Subscribe AWK.(Mid: 2)
+[2020-02-19 14:16:05,469] INFO: [MQTT] Subscribe AWK.(Mid: 2)
+[2020-02-19 14:16:05,714] INFO: [MQTT] elevator_server_available_CB :  b'offline'(Q2, R0)
+[2020-02-19 14:16:05,715] INFO: [MQTT] Publish Complete.(Mid: 1)
+[2020-02-19 14:16:05,984] INFO: [MQTT] Publish Complete.(Mid: 1)
+[2020-02-19 14:16:06,008] INFO: [MQTT] cmd_CB :  b'asdf'(Q2, R1)
+[2020-02-19 14:16:06,009] ERROR: [MQTT_cmd_CM] invalid cmd formet 
+[2020-02-19 14:16:06,292] INFO: [MQTT] elevator_server_available_CB :  b'offline'(Q2, R1)
+[2020-02-19 14:16:06,599] INFO: [MQTT] elevator_server_available_CB :  b'online'(Q2, R0)
+[2020-02-19 14:16:08,126] WARNING: [sigint_handler] catched interrupt signal!
