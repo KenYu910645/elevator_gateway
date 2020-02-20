@@ -6,8 +6,11 @@ from PIL import Image
 from PIL import ImageTk
 import queue
 import os
+import signal 
 import time
 import threading # get rid of counters, use timer
+import subprocess # for calling elevator_server.py and fake_amr_navi_center.py
+import signal
 # For IPC # message queue
 import posix_ipc
 #-------  Elevator Parameters   ---------# 
@@ -23,8 +26,6 @@ PRESS_BT_TIME    = 0.5 # sec
 
 #------- Tkinter  parameter   -------# 
 EV_PANEL_BTS_SIZE  = 3
-EV_PANEL_TOTAL_ROW = 4 # add 1 row for led 
-EV_PANEL_TOTAL_COL = 2
 # space between buttons
 EV_PANEL_PADX  = 0
 EV_PANEL_PADY  = 0
@@ -54,6 +55,14 @@ class ev_panel_bts(object):
         self.switch_server = 0 
         # picture path of this floor 
         self.pic_path = pic_path
+
+class amr_bts(object):
+    def __init__(self,frame, name, row ,column,command):
+        # Create a button object on tk
+        self.bt = tk.Button(frame, text=name ,command = command , height = EV_PANEL_BTS_SIZE, width = EV_PANEL_BTS_SIZE)
+        # where to put this button respect to panel
+        self.bt.grid(row = row , column = column, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY,\
+                                                 ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
 class app():
     def __init__(self):
         #-----------    Elevator State    ------------# 
@@ -70,7 +79,6 @@ class app():
         self.queue = queue.Queue()
         # For opened door timer
         self.timer = None
-        
         # ----------   Counters/Sensor ------------  #
         # Show how much does elevator's door opened
         # 0 ~ DOOR_COUNTER_MAX ,  0 means door fully close , DOOR_COUNTER_MAX means door fully open 
@@ -86,44 +94,101 @@ class app():
         self.window = tk.Tk()
         self.window.title("Elevator Simulator")# title of window
         self.window.iconphoto(False, tk.PhotoImage(file='pic/icon.png'))# icon of window
-        # self.window.geometry('500x800') # dont specify, tk will automatic assign a proper size.
+        self.window.geometry('1300x650') # dont specify, tk will automatic assign a proper size.
         # window.resizable(0,0) # disable resize window 
 
         # Group frame
-        self.ev_bts = tk.Frame(self.window)
-        self.ev_bts.pack(side = tk.LEFT)
-
-        # ----------   elevator_panel_buttonr ------------  # 
+        self.ev_panel = tk.Frame(self.window)
+        self.ev_panel.place(x = 0 , y = 120 , an='nw')
+        # 
+        self.ev_textbox = tk.Frame(self.ev_panel)
+        self.ev_textbox.pack(side = tk.TOP)
+        # 
+        self.ev_bts = tk.Frame(self.ev_panel)
+        self.ev_bts.pack(side = tk.TOP)
+        #
+        self.amr_bts = tk.Frame(self.window)
+        self.amr_bts.place(x = 1100 , y = 120 , an='nw')
+        #
+        self.cartoon_frame = tk.Frame(self.window)
+        self.cartoon_frame.place(x = 160 , y = 20 , an='nw')
+        # 
+        self.stdout_textbox = tk.Frame(self.window)
+        self.stdout_textbox.place(x = 500 , y = 20 , an='nw')
+        # ----------   elevator_panel_button ------------  # 
         '''
         define elevator button 
         '''
-        self.bt_dic = {"1"    : ev_panel_bts(self.ev_bts, "1F",     EV_PANEL_TOTAL_ROW-2 ,0, self.cb_bt_1f,    "pic/1_digit.pgm"),\
-                       "2"    : ev_panel_bts(self.ev_bts, "2F",     EV_PANEL_TOTAL_ROW-3 ,0, self.cb_bt_2f,    "pic/2_digit.pgm"),\
-                       "3"    : ev_panel_bts(self.ev_bts, "3F",     EV_PANEL_TOTAL_ROW-2 ,1, self.cb_bt_3f,    "pic/3_digit.pgm"),\
-                       "4"    : ev_panel_bts(self.ev_bts, "4F",     EV_PANEL_TOTAL_ROW-3 ,1, self.cb_bt_4f,    "pic/4_digit.pgm"),\
-                       "close" : ev_panel_bts(self.ev_bts, "close", EV_PANEL_TOTAL_ROW-1 ,0, self.cb_bt_close, None),\
-                       "open"  : ev_panel_bts(self.ev_bts, "open",  EV_PANEL_TOTAL_ROW-1 ,1, self.cb_bt_open , None)}
+        self.bt_dic = {"1"    : ev_panel_bts(self.ev_bts, "1F",     3 ,0, self.cb_bt_1f,    "pic/1_digit.pgm"),\
+                       "2"    : ev_panel_bts(self.ev_bts, "2F",     2 ,0, self.cb_bt_2f,    "pic/2_digit.pgm"),\
+                       "3"    : ev_panel_bts(self.ev_bts, "3F",     3 ,2, self.cb_bt_3f,    "pic/3_digit.pgm"),\
+                       "4"    : ev_panel_bts(self.ev_bts, "4F",     2 ,2, self.cb_bt_4f,    "pic/4_digit.pgm"),\
+                       "close" : ev_panel_bts(self.ev_bts, "close", 4 ,0, self.cb_bt_close, None),\
+                       "open"  : ev_panel_bts(self.ev_bts, "open",  4 ,2, self.cb_bt_open , None)}
+        tk.Label(self.ev_panel, text="Elevator Panel" , font=('Helvetica', 12)).pack(side = tk.BOTTOM)
         #define relationship among these floors, lowest floor is bt_list[0], hightest floor is bt_list[-1]
         self.bt_list = ["1" , "2" , "3" , "4"] 
-
+        # -----------  fake_amr request buttons ------------#  
+        tk.Label(self.amr_bts, text="AMR request" + '\n'+"(by MQTT)" , font=('Helvetica', 10)).grid(row = 0 , column = 0)
+        amr_bts(self.amr_bts, "open",         1 ,0, self.amr_open_cb         )
+        amr_bts(self.amr_bts, "close",        2 ,0, self.amr_close_cb        )
+        amr_bts(self.amr_bts, "precall",      3 ,0, self.amr_precall_cb      )
+        # amr_bts(self.amr_bts, "sudo_release", 4 ,0, self.amr_sudo_release_cb )
+        amr_bts(self.amr_bts, "call",         4 ,0, self.amr_call_cb         )
+        amr_bts(self.amr_bts, "enter"+'\n'+"done"   ,5 ,0, self.amr_entering_done_cb)
+        amr_bts(self.amr_bts, "release",      6 ,0, self.amr_release_cb      )
+        
         ##############################
         ###   elevator_led canvas  ###
         ##############################
         #------ Floor LED indicator --------# 
         self.canvas_floor = tk.Canvas(self.ev_bts,bg = "white", height = 50 , width = 50)
-        self.canvas_floor.grid(row = 0 , column = 0, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY\
-                                                , ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        self.canvas_floor.grid(row = 1 , column = 0)
         #------ EV state LED indicator --------# opening, closing , moving up , moving down 
         self.canvas_state = tk.Canvas(self.ev_bts,bg = "white", height = 50 , width = 50)
-        self.canvas_state.grid(row = 0 , column = 1, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY\
+        self.canvas_state.grid(row = 1 , column = 2, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY\
                                                 , ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
         
+        #------- Draw List box ---------# 
+        OptionList_precall = ["1F","2F","3F","4F"] 
+        self.precall_listbox = tk.StringVar(self.window)
+        self.precall_listbox.set(OptionList_precall[0])
+        opt1 = tk.OptionMenu(self.amr_bts , self.precall_listbox, *OptionList_precall)
+        opt1.config(height = 1 ,  width=1, font=('Helvetica', 12))
+        opt1.grid(row = 3, column = 1)
+        # 
+        OptionList_call_curr = ["1F","2F","3F","4F"] 
+        self.call_cur_listbox = tk.StringVar(self.window)
+        self.call_cur_listbox.set(OptionList_call_curr[0])
+        opt2 = tk.OptionMenu(self.amr_bts , self.call_cur_listbox, *OptionList_call_curr)
+        opt2.config(height = 1 ,  width=1, font=('Helvetica', 12))
+        opt2.grid(row = 4, column = 1)
+        # 
+        OptionList_call_tar = ["1F","2F","3F","4F"] 
+        self.call_tar_listbox = tk.StringVar(self.window)
+        self.call_tar_listbox.set(OptionList_call_tar[0])
+        opt3 = tk.OptionMenu(self.amr_bts , self.call_tar_listbox, *OptionList_call_tar)
+        opt3.config(height = 1 ,  width=1, font=('Helvetica', 12))
+        opt3.grid(row = 4, column = 2)
+
         ##############################
         ###   Draw TK object       ###
         ##############################
-        ###----------   Text box  ----------###
-        self.text = tk.Text(self.window,height = 10, width = 20)
-        self.text.pack(side = tk.TOP)
+        ###----------  Ev state Text box  ----------###
+        
+        self.text_ev_state = tk.Text(self.ev_textbox,height = 4, width = 20)
+        tk.Label(self.ev_textbox, text="Elevator Status",font=('Arial',12)).pack(side=tk.TOP)
+        self.text_ev_state.pack(side = tk.TOP)
+        
+        ###----------  elevater_server.py Text box  ----------###
+        self.text_elevator_server = tk.Text(self.stdout_textbox,height = 20, width = 80)
+        tk.Label(self.stdout_textbox, text="Elevator Server Log", font=('Arial',12)).pack(side = tk.TOP)
+        self.text_elevator_server.pack(side = tk.TOP)
+
+        ###----------  fake_amr_navi_center.py Text box  ----------###
+        self.text_amr = tk.Text(self.stdout_textbox,height = 20, width = 80)
+        tk.Label(self.stdout_textbox, text="Simulated AMR Request Log", font=('Arial',12)).pack(side = tk.TOP)
+        self.text_amr.pack(side = tk.TOP)
 
         ###----------   cartoon canvas  ----------###
         # User adjustable parameter
@@ -153,8 +218,7 @@ class app():
         floor_height = max_ev_movement / (len(self.bt_list)-1)
 
         #------ cartoon canvas --------#
-        self.canvas_cartoon = tk.Canvas(self.window,bg = "white", height = total_height , width = total_width)
-        # self.canvas_state.grid(row = 0 , column = 1, padx = EV_PANEL_PADX , pady = EV_PANEL_PADY, ipadx = EV_PANEL_IPADX, ipady = EV_PANEL_IPADY)
+        self.canvas_cartoon = tk.Canvas(self.cartoon_frame,bg = "white", height = total_height , width = total_width)
         self.canvas_cartoon.pack(side = tk.LEFT)
         
         #----------   Draw elevator well ----------#
@@ -181,7 +245,7 @@ class app():
         #----------   Draw amr  ----------#
         self.amr_location_x = total_width/2 -100
         self.amr_location_y = floors_an_list[0][0][1] - amr_height
-        self.canvas_cartoon.create_rectangle(self.amr_location_x,self.amr_location_y,self.amr_location_x+amr_width,self.amr_location_y + amr_height, fill = "yellow")
+        # self.canvas_cartoon.create_rectangle(self.amr_location_x,self.amr_location_y,self.amr_location_x+amr_width,self.amr_location_y + amr_height, fill = "yellow")
         
         # helper variable for cute cartoon 
         self.CARTOON_EV_MOVING_VEL    =   max_ev_movement/((NEXT_FLOOR_TIME/LOOP_PERIOD)*(len(self.bt_list) - 1))
@@ -192,18 +256,83 @@ class app():
         self.OPENING_VEL = DOOR_SENSOR_MAX/(DOOR_OPENING_TIME/LOOP_PERIOD)
         self.CLOSING_VEL = DOOR_SENSOR_MAX/(DOOR_CLOSING_TIME/LOOP_PERIOD)
         
-        #------ Dark Magic ------#
-        os.system("gnome-terminal -e 'python3 elevator_server.py'")
-        os.system("gnome-terminal -e 'python3 fake_amr_navi_center.py'")
+        #---- create two child thread to execute ------# 
+        self.t_ev_server = subprocess.Popen(["python3" ,"-u" ,"elevator_server.py"]     , shell=False, stdout=subprocess.PIPE ,stderr=subprocess.PIPE ,bufsize=1,close_fds=True)
+        self.t_amr       = subprocess.Popen(["python3" ,"-u", "fake_amr_navi_center.py"], shell=False, stdout=subprocess.PIPE ,stderr=subprocess.PIPE ,stdin=subprocess.PIPE,bufsize=1,close_fds=True)
+        
+        #---- create a deamon to print child process stdout to textbox -----#
+        t1 = threading.Thread(target=self.read_print_to_textBox, args=(self.t_ev_server.stdout,self.text_elevator_server))
+        t1.daemon = True # thread dies with the program
+        t1.start()
+
+        #---- create a deamon to print child process stdout to textbox -----#
+        t2 = threading.Thread(target=self.read_print_to_textBox, args=(self.t_ev_server.stderr,self.text_elevator_server))
+        t2.daemon = True # thread dies with the program
+        t2.start()
+        
+        #---- create a deamon to print child process stdout to textbox -----#
+        t3 = threading.Thread(target=self.read_print_to_textBox, args=(self.t_amr.stdout,self.text_amr))
+        t3.daemon = True # thread dies with the program
+        t3.start()
+
+        t4 = threading.Thread(target=self.read_print_to_textBox, args=(self.t_amr.stderr,self.text_amr))
+        t4.daemon = True # thread dies with the program
+        t4.start()
+
+        # --- signal handler -----# 
+        signal.signal(signal.SIGINT, self.sigint_handler)
+        signal.signal(signal.SIGHUP, self.sigint_handler)
+        signal.signal(signal.SIGTERM, self.sigint_handler)
+
         #------ message queue for IPC -------# 
-        self.mq_send = posix_ipc.MessageQueue('/simu_IPC_reply', posix_ipc.O_CREAT)
-        self.mq_send.block = False # non-blocking recv , send
-        self.mq_recv = posix_ipc.MessageQueue('/simu_IPC_cmd'  , posix_ipc.O_CREAT)
-        self.mq_recv.block = False # non-blocking recv , send
+        self.mq_send = posix_ipc.MessageQueue('/simu_IPC_reply', posix_ipc.O_CREAT)# |posix_ipc.O_EXCL)
+        self.mq_send.block = False # non-blocking send
+        self.mq_recv = posix_ipc.MessageQueue('/simu_IPC_cmd'  , posix_ipc.O_CREAT)# |posix_ipc.O_EXCL)
+        self.mq_recv.block = False # non-blocking recv 
+        self.mq_amr_send = posix_ipc.MessageQueue('/button_IPC', posix_ipc.O_CREAT)# |posix_ipc.O_EXCL)
+        self.mq_amr_send.block = False # non-blocking send
         ###-----------   start main loop   -------------###
         self.main() # Recursive call main()
         self.window.mainloop()
 
+        #----- terminate process after close window -----# 
+        self.terminate_all()
+
+    def terminate_all(self):
+        '''
+        Terminate every child thread and window 
+        '''
+        try:
+            # terminate TK gui
+            self.window.destroy()
+        except:
+            pass # TK is already gone.
+        # close all message queue and destroy them 
+        self.mq_send.close()
+        self.mq_recv.close()
+        self.mq_amr_send.close()
+        self.mq_send.unlink()
+        self.mq_recv.unlink()
+        self.mq_amr_send.unlink()
+        # terminate two child process 
+        self.t_amr.terminate() # Send SIGTERM to child
+        self.t_ev_server.terminate() # Send SIGTERM to child
+        self.t_amr.wait()
+        self.t_ev_server.wait()
+
+    def sigint_handler(self, signum, frame):
+        self.terminate_all()
+
+
+    def read_print_to_textBox(self, out, textbox):
+        for line in iter(out.readline, b''):
+            # textbox.configure(state='normal') # read-only 
+            textbox.insert("insert", line )
+            # textbox.configure(state='disabled')
+            textbox.see("end")
+        out.close()
+
+    
     def LED_cancel_wrong_floor(self):
         '''
         Toggle Led status to cancel illegal bts led
@@ -275,13 +404,37 @@ class app():
         Current floor led will sustain a bit while after being pressed
         '''
         bt.led = 0
-    
+    def update_switch_and_led (self):
+        #-----  Trun on priviliage button -------# 
+        for bt_key in self.bt_dic: 
+            if  self.bt_dic[bt_key].switch_server == 1:
+                self.bt_dic[bt_key].switch = 1
+        #-----  Turn on led if switch is on -------# 
+        for bt in self.bt_dic: 
+            if  self.bt_dic[bt].switch == 1:
+                self.bt_dic[bt].led = 1
+        
+        ###########################
+        ###   Show LED Status   ###
+        ###########################
+        '''
+        If led = 1  ->  button highlight
+        If led = 0  ->  button don't highlight
+        '''
+        for bt_key in self.bt_dic:
+            bt = self.bt_dic[bt_key]
+            if bt.led == 1: # led of button is on 
+                bt.bt.configure(bg = BUTTON_HIGHLIGHT_COLOR)
+                bt.bt.configure(activebackground = bt.bt.cget('background'))
+            else: # led of button is off 
+                bt.bt.configure(bg = BUTTON_COLOR)
+                bt.bt.configure(activebackground = bt.bt.cget('background'))
+        
     def main(self): # main loop 
+        self.update_switch_and_led()
         #------- Check cmd from elevator_server ----------# 
-        # if not self.queue.empty(): # New cmd to do 
         try: 
             cmd = self.mq_recv.receive()[0].decode().split() # non-blocking receiver
-        #cmd = self.queue.get().decode().split()# pop out one cmd to do 
         except posix_ipc.BusyError:
             pass # queue empty
         else:
@@ -290,13 +443,13 @@ class app():
             if cmd[0] == 'w':
                 if cmd[1] in self.bt_dic and (cmd[2] == '1' or cmd[2] == '0'):
                     self.bt_dic[cmd[1]].switch_server = int(cmd[2])
+                    self.update_switch_and_led()
             # ------- Read  Cmd --------#  
             elif cmd[0] == 'r':
                 if cmd[1] in self.bt_dic:
                     ans = self.bt_dic[cmd[1]].led
                     # Output ans through IPC 
                     print ("reply:" + str(ans))
-                    # self.mqtt_ipc.publish(topic = "/simu_IPC/reply" , payload = str(ans), qos = 0, retain = True)
                     try:
                         self.mq_send.send(str(ans), priority=9)
                     except posix_ipc.BusyError: # queue full
@@ -304,19 +457,6 @@ class app():
             else: # Error cmd 
                 pass 
         
-        # Privilage switch server 
-        for bt_key in self.bt_dic:
-            if self.bt_dic[bt_key].switch_server: # privilage switch is on! 
-                self.bt_dic[bt_key].switch = 1 
-
-
-        #-----  Turn on led if switch is on -------# 
-        for bt in self.bt_dic: 
-            #if bt == self.current_floor:
-            #    continue
-            if  self.bt_dic[bt].switch == 1:
-                self.bt_dic[bt].led = 1
-
         #-----   Check if any floor button is on -------# 
         is_floor_LED = False
         for bt in self.bt_dic:
@@ -430,8 +570,10 @@ class app():
             t.start()
 
         #------- Reset switch -------# I trust these switch has been used.
+        # But dont reset privilage switch 
         for bt in self.bt_dic:
-            self.bt_dic[bt].switch = 0 
+            # if not self.bt_dic[bt].switch_server: # not priviailge
+            self.bt_dic[bt].switch = 0
 
         #############################
         ###   Show Floor canvas   ###
@@ -470,34 +612,18 @@ class app():
         else:
             pass
         
-        ###########################
-        ###   Show LED Status   ###
-        ###########################
-        '''
-        If led = 1  ->  button highlight
-        If led = 0  ->  button don't highlight
-        '''
-        for bt_key in self.bt_dic:
-            bt = self.bt_dic[bt_key]
-            if bt.led == 1: # led of button is on 
-                bt.bt.configure(bg = BUTTON_HIGHLIGHT_COLOR)
-                bt.bt.configure(activebackground = bt.bt.cget('background'))
-            else: # led of button is off 
-                bt.bt.configure(bg = BUTTON_COLOR)
-                bt.bt.configure(activebackground = bt.bt.cget('background'))
         
         ###########################
         ###   Text show state   ###
         ###########################
-        self.text.delete(1.0,tk.END)
-        self.text.insert("insert","state :" + self.state + '\n')
-        self.text.insert("insert","direction :" + self.direction + '\n')
-        self.text.insert("insert","current floor :" + self.current_floor+ '\n')
-        self.text.insert("insert","target  floor :" + self.target_floor + '\n')
+        self.text_ev_state.delete(1.0,tk.END)
+        self.text_ev_state.insert("insert","state :"         + self.state + '\n')
+        self.text_ev_state.insert("insert","direction :"     + self.direction + '\n')
+        self.text_ev_state.insert("insert","current floor :" + self.current_floor+ '\n')
+        self.text_ev_state.insert("insert","target  floor :" + self.target_floor + '\n')
         
         #----- Recursive call main() --------# 
         self.window.after(int(LOOP_PERIOD*1000),self.main)
-
 
     def canvas_animate(self,period,pic_list):
         '''
@@ -578,4 +704,22 @@ class app():
         self.bt_dic['open'].switch = 1
     def cb_bt_close(self):
         self.bt_dic['close'].switch = 1
+    
+    def amr_open_cb(self):
+        self.mq_amr_send.send("open", priority=9)
+    def amr_close_cb(self):
+        self.mq_amr_send.send("close", priority=9)
+    def amr_precall_cb(self):
+        floor = self.precall_listbox.get()[0]
+        self.mq_amr_send.send("precall " + str(floor), priority=9) 
+    #def amr_sudo_release_cb(self):
+    #    self.mq_amr_send.send("sudo_release", priority=9) 
+    def amr_call_cb(self):
+        cur_floor = self.call_cur_listbox.get()[0]
+        tar_floor = self.call_tar_listbox.get()[0]
+        self.mq_amr_send.send("call " + str(cur_floor) + " " + str(tar_floor), priority=9) 
+    def amr_entering_done_cb(self):
+        self.mq_amr_send.send("enter", priority=9)
+    def amr_release_cb(self):
+        self.mq_amr_send.send("rele", priority=9) 
 app()

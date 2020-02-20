@@ -5,7 +5,7 @@ if IS_USING_MQTT:
     from global_var.global_logger import logger
 
     # ------  Connection ------ #
-    mqtt_obj = MQTT_OBJ(client_id=CLIENT_NAME, broker_ip=BROKER_IP, port=1883, keepalive=10, clean_session=False, logger = logger)
+    mqtt_obj = MQTT_OBJ(client_id=CLIENT_NAME, broker_ip=BROKER_IP, port=1883, keepalive=10, clean_session=True, logger = logger)
     # Wait for connection Accpeted by broker (Optional) 
     #while mqtt_obj.available != "online":
     #    time.sleep(0.1)

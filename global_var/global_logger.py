@@ -1,20 +1,21 @@
 import logging 
 import argparse
+import sys 
 
 ##################
 ####  logger   ###
 ##################
 # Set up logger
 formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
-logger = logging.getLogger('cherrypy')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger('ev_logger')
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 #Set up args
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
                     help='Enable debug info on consolo')
 args = parser.parse_args()
-
+'''
 # Print out logging message on console
 h_console = logging.StreamHandler()
 h_console.setFormatter(formatter)
@@ -23,7 +24,7 @@ if args.verbose:
 else:
     h_console.setLevel(logging.INFO)
 logger.addHandler(h_console)
-
+'''
 # Record logging message at logging file
 h_file = logging.FileHandler("elevator_server.log")
 h_file.setFormatter(formatter)

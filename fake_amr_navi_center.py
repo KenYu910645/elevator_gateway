@@ -1,13 +1,25 @@
 #!/usr/bin/env python
 import time
+import sys
+import signal
+import posix_ipc
 import paho.mqtt.client as mqtt
 from global_var.global_logger import logger
 import json
 from MQTT.mqtt_template import MQTT_OBJ
-from global_var.global_param import BROKER_IP, AMR_MQTT_NAME
+from global_var.global_param import BROKER_IP, AMR_MQTT_NAME, IS_SIMULATION
 
 CLIENT_NAME = "test" # Tow different mqtt client MUST have different name. '#' , '+' , '/' are NOT allow in topic name
 is_ev_available = ""
+
+is_running = True 
+def sigint_handler(signum, frame):
+    # mq_recv.close()
+    global is_running
+    is_running = False
+signal.signal(signal.SIGINT, sigint_handler)
+signal.signal(signal.SIGHUP, sigint_handler)
+signal.signal(signal.SIGTERM, sigint_handler)
 
 ############################
 ###  CallBack functions  ###
@@ -35,7 +47,7 @@ if __name__ == '__main__':
     client_id , broker_ip , logger  : should be setup right.
         logger is a python logging handle, if you don't want to use it , pass None . (logger = None)
     '''
-    mqtt_obj = MQTT_OBJ(client_id=CLIENT_NAME, broker_ip=BROKER_IP, port=1883, keepalive=10, clean_session=False, logger = logger)
+    mqtt_obj = MQTT_OBJ(client_id=CLIENT_NAME, broker_ip=BROKER_IP, port=1883, keepalive=10, clean_session=True, logger = logger)
         # Wait for connection Accpeted by broker (Optional) 
     while mqtt_obj.available != "online":
         time.sleep(0.1)
@@ -47,17 +59,27 @@ if __name__ == '__main__':
     '''
     mqtt_obj.add_subscriber([ (CLIENT_NAME+"/elevator_server/status", 2, ev_status_CB) , (CLIENT_NAME+"/elevator_server/reply", 2, ev_reply_CB) , ("elevator_server/available", 2, elevator_server_available_CB)])
 
-    while True:
+    if IS_SIMULATION: 
+        mq_recv = posix_ipc.MessageQueue('/button_IPC', posix_ipc.O_CREAT)
+        mq_recv.block = True  # non-blocking recv , send
+    
+    while is_running:
         # --------- Check Mqtt Connection ---------# 
         # User should always check current connection status, before publishing any message.
+        
         user_type = ""
-        try:
-            user_type = input("Type Cmd: ")
-        except: 
-            print ("ERROR on input ()")
+        if IS_SIMULATION:
+            r = mq_recv.receive() # blocking
+            user_type = r[0].decode()
         else:
-            if user_type == 'q':
-                break
+            try:
+                user_type = input("Type Cmd: ")
+            except: 
+                print ("ERROR on input ()")
+            else:
+                if user_type == 'q':
+                    break
+        
         if mqtt_obj.available == "offline":
             logger.warn("[MQTT] No Mqtt Connection")
             # TODO 
@@ -83,42 +105,46 @@ if __name__ == '__main__':
                 paylaod_dict = {}
                 user_type_list = user_type.split()
                 print (user_type_list)
+                try: 
+                    cmd_type = user_type_list[0]
+                except:
+                    continue
                 # ------ Utility cmd ------# 
                 # open -> open elevator door
                 # close -> close elevator door 
-                if  user_type_list[0] == 'open' or user_type_list[0] == 'close' or user_type_list[0] == 'release_button' :
-                    paylaod_dict  = json.dumps({"cmd" : user_type_list[0] , "robot_id" : robot_id , "tid" : tid})
+                if  cmd_type == 'open' or cmd_type == 'close' or cmd_type == 'release_button' :
+                    paylaod_dict  = json.dumps({"cmd" : cmd_type , "robot_id" : robot_id , "tid" : tid})
                 # ------ Often Used cmd ------# 
                 # call X Y, AMR call elevator to pick up AMR at X floor and put down AMR at Y floor  
-                elif user_type_list[0] == 'call':
+                elif cmd_type == 'call':
                     try: 
                         current_floor = user_type_list[1]
                         target_floor  = user_type_list[2]
-                        paylaod_dict  = json.dumps({"cmd" : user_type_list[0] , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
+                        paylaod_dict  = json.dumps({"cmd" : cmd_type , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
                     except:
                         logger.error("[MQTT_cmd_CM] unknow cmd ")
                         continue
                 # Press floor button 
                 # 'precall 1' -> press floor 1 button ,  'precall 4' -> press floor 4 button
-                elif user_type_list[0] == 'precall':
+                elif cmd_type == 'precall':
                     try: 
                         target_floor = user_type_list[1]
-                        paylaod_dict  = json.dumps({"cmd" : user_type_list[0] , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
+                        paylaod_dict  = json.dumps({"cmd" : cmd_type , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
                     except:
                         logger.error("[MQTT_cmd_CM] unknow cmd ")
                         continue
                 # Tell elevator server AMR has already enter elevator
-                elif user_type_list[0] == 'enter':
+                elif cmd_type == 'enter':
                     paylaod_dict  = json.dumps({"cmd" : "entering_done" , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
                 # Release control over elevator
-                elif user_type_list[0] == 'rele':
+                elif cmd_type == 'rele':
                     paylaod_dict  = json.dumps({"cmd" : "release" , "robot_id" : robot_id , "tid" : tid , "current_floor" : current_floor, "target_floor":target_floor })
                 # Reboot elevator server 
-                elif user_type_list[0] == 'reboot':
-                    paylaod_dict  = json.dumps({"cmd" : user_type_list[0] , "robot_id" : robot_id , "tid" : tid , "pw" : "elevator_server"})
+                elif cmd_type == 'reboot':
+                    paylaod_dict  = json.dumps({"cmd" : cmd_type , "robot_id" : robot_id , "tid" : tid , "pw" : "elevator_server"})
                 #----   Test cmd   -----# 
                 # 'w 1 0' => write key 1 to low , 'w 4 1' -> write key 4 to high
-                elif user_type_list[0] == 'w':
+                elif cmd_type == 'w':
                     try: 
                         key = user_type_list[1]
                         d   = user_type_list[2]
@@ -126,17 +152,17 @@ if __name__ == '__main__':
                     except:
                         logger.error("[MQTT_cmd_CM] unknow cmd ") 
                 # 'r 1' -> read key 1 is high or low , 'r 3' -> read key 3 is high or low
-                elif user_type_list[0] == 'r':
+                elif cmd_type == 'r':
                     try: 
                         key = user_type_list[1]
                         paylaod_dict  = json.dumps({"cmd" : "EVledRead" , "key" : key })
                     except:
                         logger.error("[MQTT_cmd_CM] unknow cmd ")
                 # manditory release control over elevator
-                elif user_type_list[0] == 'sudo_release':
-                    paylaod_dict  = json.dumps({"cmd" : user_type_list[0] })
+                elif cmd_type == 'sudo_release':
+                    paylaod_dict  = json.dumps({"cmd" : cmd_type })
                 # 
-                elif user_type_list[0] == 'reached':
+                elif cmd_type == 'reached':
                     mqtt_obj.publish(topic = 'AMR250_3/elevator_server/reply', payload=json.dumps({"cmd" : "reached" , "robot_id" : "AMR250_3", "floor" : '1' }), qos=2, retain = False)
                     continue
                 else: 
@@ -156,4 +182,4 @@ if __name__ == '__main__':
                         pass
             else: 
                 logger.warn("[MQTT] One of the client is not online.")
-        time.sleep(3)
+        time.sleep(0.01)

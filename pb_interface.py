@@ -31,25 +31,29 @@ class PB_interface_simu():
         try:
             self.mq_send.send(sendBuff, priority = 9)
         except posix_ipc.BusyError: # queue full
-            pass 
+            logger.error("[EVledWrite] IPC queue full, can't send.") 
         return 'G'
     
     def EVledRead(self, key, retryTime=3):
         try : 
             self.mq_send.send("r " + str(key), priority = 9)
         except posix_ipc.BusyError: # queue full
+            logger.error("[EVledRead] IPC queue full!.")
             return -1 # Error queue full 
-        # Wait for answer for 1 sec. 
-        t_start_wait = time.time()
-        while time.time()  - t_start_wait < 1: # 1 sec 
-            try:
-                r = self.mq_recv.receive()
-            except posix_ipc.BusyError:
-                pass # queue empty, keep waiting
-            else: # Get msg
-                return int(r[0])
-        return -1 # Error , timeout 
-
+        else: 
+            # Wait for answer for 1 sec. 
+            t_start_wait = time.time()
+            while time.time()  - t_start_wait < 1: # 1 sec 
+                try:
+                    r = self.mq_recv.receive()[0].decode()
+                    # logger.info("[EVledRead]" + r)
+                except posix_ipc.BusyError:
+                    pass # queue empty, keep waiting
+                else: # Get msg
+                    return int(r)
+            logger.error("[EVledRead] TIMEOUT!.")
+            return -1 # Error , timeout 
+    
 class PB_interface():
     def __init__(self):
         # TODO You must modified this after installation.
