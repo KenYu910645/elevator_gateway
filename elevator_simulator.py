@@ -171,11 +171,7 @@ class app():
         opt3.config(height = 1 ,  width=1, font=('Helvetica', 12))
         opt3.grid(row = 4, column = 2)
 
-        ##############################
-        ###   Draw TK object       ###
-        ##############################
         ###----------  Ev state Text box  ----------###
-        
         self.text_ev_state = tk.Text(self.ev_textbox,height = 4, width = 20)
         tk.Label(self.ev_textbox, text="Elevator Status",font=('Arial',12)).pack(side=tk.TOP)
         self.text_ev_state.pack(side = tk.TOP)
@@ -216,7 +212,7 @@ class app():
         
         max_ev_movement = ev_well_height - ev_height - 2*gap
         floor_height = max_ev_movement / (len(self.bt_list)-1)
-
+        
         #------ cartoon canvas --------#
         self.canvas_cartoon = tk.Canvas(self.cartoon_frame,bg = "white", height = total_height , width = total_width)
         self.canvas_cartoon.pack(side = tk.LEFT)
