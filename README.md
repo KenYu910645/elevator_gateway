@@ -1,5 +1,29 @@
 # AMR_Elevator
-## File orientation
+
+## Elevator simulation
+Execute elevator_simulator.py to start a simulation GUI
+```
+$ python3 elevator_simulator.py
+```
+Following window will pop out.
+![simulation GUI](/GUI.jpeg)
+Buttons on left hand side simulated as buttons on elevator panel,
+Two white sqare above, show which floor is the elevator at, and direction of elevator moving. 
+Buttons on right hand side simulated as Robot(AMR) sending request to elevator server.
+
+
+Explain command : 
+open: Make elevator open the door, and don't release until timeout or "release" is called 
+close : Make elevator close the door
+precall : press the floor button which user assigned at rightside listbox
+call :  
+## Simulation dependency
+1. TK
+2. IPC
+
+
+
+## File stucture guide
 
 ### Main program 
 1. **elevator_server.py**
@@ -60,6 +84,7 @@ Execute elevator_server.py:
 ```
 $ sudo python elevator_server.py 
 ```
+
 # Test 
 ### Using HTTP(curl) to test EVB
 Instruction of usage will print on terminal, after execute this cmd.
