@@ -5,12 +5,10 @@ import tkinter.messagebox
 from PIL import Image
 from PIL import ImageTk
 import queue
-import os
-import signal 
+import signal
 import time
 import threading # get rid of counters, use timer
 import subprocess # for calling elevator_server.py and fake_amr_navi_center.py
-import signal
 # For IPC # message queue
 import posix_ipc
 #-------  Elevator Parameters   ---------# 
