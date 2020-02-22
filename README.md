@@ -1,6 +1,10 @@
-# AMR_Elevator
+# Elevator Server
+
+An IOT communication system that can let AMR(robot) taking elevator.
 
 ## Elevator simulation
+
+Simulation that don't depend on elevator system and AMR. Useful tool for elevator server development.
 
 ### Prerequisite 
 This simulation project is developed on Python 3.5.2
@@ -16,8 +20,7 @@ $ python3 elevator_simulator.py
 
 GUI window will pop out.
 
-![simulation GUI](/GUI.jpeg)
-
+![simulation GUI](pic/veido.gif)
 
 Elevator panel on left hand side represents buttons and LED display "inside" elevator.User may toggle these buttons as acutally people pressing button in elevator.
 
@@ -55,8 +58,8 @@ release
 Release all the button press on elevator panel, and cancel any on-going request ("call") on elevator server.
 
 #### Communication flow diagram 
-![simulation GUI](/communication.jpg)
-![simulation GUI](/relationship.jpg)
+![simulation GUI](pic/communication.jpg)
+![simulation GUI](pic/relationship.jpg)
 
 ## Files guide
 
